@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 const ThemeContext = createContext();
+const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
 
 export const useTheme = () => useContext(ThemeContext);
 
@@ -21,7 +22,7 @@ export const ThemeProvider = ({ children }) => {
     try {
       const token = sessionStorage.getItem('token');
       if (!token) return;
-      await fetch('http://localhost:5000/api/auth/theme', {
+      await fetch(`${API_BASE_URL}/api/auth/theme`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -41,7 +42,7 @@ export const ThemeProvider = ({ children }) => {
       try {
         const token = sessionStorage.getItem('token');
         if (!token) return; // no user logged in
-        const res = await fetch('http://localhost:5000/api/auth/theme', {
+        const res = await fetch(`${API_BASE_URL}/api/auth/theme`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (!res.ok) return;

@@ -4,6 +4,7 @@ import React, { createContext, useState, useContext, useEffect, useRef } from 'r
 import axios from 'axios';
 
 const AuthContext = createContext();
+const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
 
 export const useAuth = () => {
   return useContext(AuthContext);
@@ -28,7 +29,7 @@ export const AuthProvider = ({ children }) => {
     const requestId = ++activeVerifyRequestId.current;
 
     try {
-      const response = await axios.get('http://localhost:5000/api/auth/profile', {
+      const response = await axios.get(`${API_BASE_URL}/api/auth/profile`, {
         headers: { Authorization: `Bearer ${tokenToVerify}` }
       });
 
@@ -55,7 +56,7 @@ export const AuthProvider = ({ children }) => {
       delete axios.defaults.headers.common['Authorization'];
       setUser(null);
 
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
+      const response = await axios.post(`${API_BASE_URL}/api/auth/login`, {
         username,
         password
       });

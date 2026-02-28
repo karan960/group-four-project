@@ -18,7 +18,7 @@ import {
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import './StudentDashboard.css';
 
-const localStorage = window.sessionStorage;
+const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;const localStorage = window.sessionStorage;
 
 // Register ChartJS components
 ChartJS.register(
@@ -179,7 +179,7 @@ const StudentDashboard = () => {
       const token = localStorage.getItem('token');
       
       const response = await axios.post(
-        'http://localhost:5000/api/change-requests/profile',
+        `${API_BASE_URL}/api/change-requests/profile`,
         {
           studentPRN: user.referenceId,
           requestedBy: user.username,
@@ -270,7 +270,7 @@ const StudentDashboard = () => {
 
       // Fetch specific student profile using their PRN
       const profileResponse = await axios.get(
-        `http://localhost:5000/api/students/${user.referenceId}/profile`,
+        `${API_BASE_URL}/api/students/${user.referenceId}/profile`,
         {
           headers: { 'Authorization': `Bearer ${token}` }
         }
@@ -341,7 +341,7 @@ const StudentDashboard = () => {
     try {
       setCoursesLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/courses', {
+      const response = await axios.get(`${API_BASE_URL}/api/courses`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setCourses(response.data.courses || []);
@@ -356,7 +356,7 @@ const StudentDashboard = () => {
     try {
       setAssignmentsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/assignments', {
+      const response = await axios.get(`${API_BASE_URL}/api/assignments`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setAssignments(response.data.assignments || []);
@@ -393,7 +393,7 @@ const StudentDashboard = () => {
       formData.append('file', form.file);
 
       const response = await axios.post(
-        `http://localhost:5000/api/assignments/${assignmentId}/submissions`,
+        `${API_BASE_URL}/api/assignments/${assignmentId}/submissions`,
         formData,
         {
           headers: {
@@ -921,7 +921,7 @@ const StudentDashboard = () => {
                               )}
                               {course.attachmentUrl && (
                                 <a
-                                  href={`http://localhost:5000${course.attachmentUrl}`}
+                                  href={`${API_BASE_URL}${course.attachmentUrl}`}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="stat-label"
@@ -958,7 +958,7 @@ const StudentDashboard = () => {
                               )}
                               {assignment.attachmentUrl && (
                                 <a
-                                  href={`http://localhost:5000${assignment.attachmentUrl}`}
+                                  href={`${API_BASE_URL}${assignment.attachmentUrl}`}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="confidence-label"

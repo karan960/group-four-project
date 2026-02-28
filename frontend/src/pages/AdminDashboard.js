@@ -20,6 +20,7 @@ import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import './AdminDashboard.css';
 
 const localStorage = window.sessionStorage;
+const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
 
 // Register ChartJS components
 ChartJS.register(
@@ -56,7 +57,7 @@ const ProfileDropdown = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      await axios.put('http://localhost:5000/api/users/profile', profileData, {
+      await axios.put(`${API_BASE_URL}/api/users/profile`, profileData, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       alert('Profile updated successfully!');
@@ -217,10 +218,10 @@ const DashboardOverview = () => {
       const token = localStorage.getItem('token');
 
       const [overviewResponse, dashboardResponse] = await Promise.all([
-        axios.get('http://localhost:5000/api/dashboard/admin/overview', {
+        axios.get(`${API_BASE_URL}/api/dashboard/admin/overview`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        axios.get('http://localhost:5000/api/dashboard/admin/dashboard', {
+        axios.get(`${API_BASE_URL}/api/dashboard/admin/dashboard`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
@@ -251,13 +252,13 @@ const DashboardOverview = () => {
     try {
       const token = localStorage.getItem('token');
       const [studentsRes, facultyRes, usersRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/students', {
+        axios.get(`${API_BASE_URL}/api/students`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        axios.get('http://localhost:5000/api/faculty', {
+        axios.get(`${API_BASE_URL}/api/faculty`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        axios.get('http://localhost:5000/api/users', {
+        axios.get(`${API_BASE_URL}/api/users`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
@@ -503,7 +504,7 @@ const DataManagement = () => {
       const token = localStorage.getItem('token');
       
       if (activeTab === 'students') {
-        const response = await axios.get('http://localhost:5000/api/students', {
+        const response = await axios.get(`${API_BASE_URL}/api/students`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -516,7 +517,7 @@ const DataManagement = () => {
         
         setStudents(dataArray);
       } else {
-        const response = await axios.get('http://localhost:5000/api/faculty', {
+        const response = await axios.get(`${API_BASE_URL}/api/faculty`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -559,7 +560,7 @@ const DataManagement = () => {
       formData.append('type', uploadType);
       formData.append('mapping', JSON.stringify(columnMapping));
 
-      const response = await axios.post('http://localhost:5000/api/upload-excel', formData, {
+      const response = await axios.post(`${API_BASE_URL}/api/upload-excel`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${token}`
@@ -773,7 +774,7 @@ const DataManagement = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:5000/api/announcements', {
+      const response = await axios.post(`${API_BASE_URL}/api/announcements`, {
         message: announcement,
         target: announcementTarget,
         createdBy: user.username,
@@ -795,7 +796,7 @@ const DataManagement = () => {
   const handleSystemAudit = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/audit-logs', {
+      const response = await axios.get(`${API_BASE_URL}/api/audit-logs`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -824,7 +825,7 @@ const DataManagement = () => {
       setQuickActionStatus('🔄 Backup in progress...');
       const token = localStorage.getItem('token');
       
-      const response = await axios.post('http://localhost:5000/api/backup', {}, {
+      const response = await axios.post(`${API_BASE_URL}/api/backup`, {}, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -1580,8 +1581,8 @@ const ChangeRequestsManagement = () => {
       setLoading(true);
       const token = localStorage.getItem('token');
       const endpoint = filter === 'pending' 
-        ? 'http://localhost:5000/api/change-requests/pending'
-        : 'http://localhost:5000/api/change-requests/all';
+        ? `${API_BASE_URL}/api/change-requests/pending`
+        : `${API_BASE_URL}/api/change-requests/all`;
       
       const response = await axios.get(endpoint, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -1611,7 +1612,7 @@ const ChangeRequestsManagement = () => {
       const token = localStorage.getItem('token');
       
       await axios.put(
-        `http://localhost:5000/api/change-requests/${requestId}/approve`,
+        `${API_BASE_URL}/api/change-requests/${requestId}/approve`,
         { approvedBy: user.username },
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
@@ -1634,7 +1635,7 @@ const ChangeRequestsManagement = () => {
       const token = localStorage.getItem('token');
       
       await axios.put(
-        `http://localhost:5000/api/change-requests/${requestId}/reject`,
+        `${API_BASE_URL}/api/change-requests/${requestId}/reject`,
         { rejectedBy: user.username, reason },
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
@@ -2108,7 +2109,7 @@ const MLModelControl = () => {
                   setAnalysisLoading(true);
                   setAnalysisError('');
                   const token = localStorage.getItem('token');
-                  const res = await axios.post('http://localhost:5000/api/ml-analysis/class-statistics', {
+                  const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/class-statistics`, {
                     year: analysisFilters.year,
                     branch: analysisFilters.branch,
                     division: analysisFilters.division
@@ -2125,7 +2126,7 @@ const MLModelControl = () => {
                   setAnalysisLoading(true);
                   setAnalysisError('');
                   const token = localStorage.getItem('token');
-                  const res = await axios.post('http://localhost:5000/api/ml-analysis/at-risk-students', {
+                  const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/at-risk-students`, {
                     year: analysisFilters.year,
                     branch: analysisFilters.branch,
                     division: analysisFilters.division
@@ -2142,7 +2143,7 @@ const MLModelControl = () => {
                   setAnalysisLoading(true);
                   setAnalysisError('');
                   const token = localStorage.getItem('token');
-                  const res = await axios.post('http://localhost:5000/api/ml-analysis/subject-analysis', {
+                  const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/subject-analysis`, {
                     subject_name: analysisFilters.subjectName || 'All Subjects',
                     year: analysisFilters.year,
                     branch: analysisFilters.branch,
@@ -2224,6 +2225,8 @@ const UserManagement = () => {
     referenceId: ''
   });
   const [loading, setLoading] = useState(false);
+  const [selectedUserType, setSelectedUserType] = useState(null); // null, 'student', 'faculty', 'admin'
+  const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
 
   useEffect(() => {
     fetchUsers();
@@ -2233,7 +2236,7 @@ const UserManagement = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/users', {
+      const response = await axios.get(`${API_BASE_URL}/api/users`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -2251,7 +2254,7 @@ const UserManagement = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:5000/api/register', newUser, {
+      const response = await axios.post(`${API_BASE_URL}/api/register`, newUser, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -2268,7 +2271,6 @@ const UserManagement = () => {
   const handleDeleteUser = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        // Note: You'll need to add a delete user endpoint in backend
         alert('User deletion feature would be implemented with backend API');
       } catch (error) {
         alert('Error deleting user: ' + error.message);
@@ -2276,133 +2278,203 @@ const UserManagement = () => {
     }
   };
 
-  return (
+  const studentUsers = users.filter(u => u.role === 'student');
+  const facultyUsers = users.filter(u => u.role === 'faculty');
+  const adminUsers = users.filter(u => u.role === 'admin');
+
+  const UserTable = ({ title, icon, data, roleColor }) => (
+    <div className="card">
+      <div className="card-header">
+        <h3 className="card-title">{icon} {title} ({data.length})</h3>
+      </div>
+      {data.length === 0 ? (
+        <div className="empty-state">
+          <p>No {title.toLowerCase()} users found</p>
+        </div>
+      ) : (
+        <div className="table-responsive">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Reference ID</th>
+                <th>Last Login</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((user) => (
+                <tr key={user._id}>
+                  <td>{user.username}</td>
+                  <td>{user.referenceId}</td>
+                  <td>{user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}</td>
+                  <td>
+                    <span className={`status-badge ${user.isActive ? 'active' : 'inactive'}`}>
+                      {user.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td>
+                    <button 
+                      onClick={() => handleDeleteUser(user._id)}
+                      className="btn-delete"
+                      title="Delete user"
+                    >
+                      🗑️
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+
+  const SummaryView = () => (
     <div>
       <div className="section-header">
-        <h1>User Management</h1>
-        <p>Manage system users and permissions</p>
+        <h1>👥 User Management</h1>
+        <p>Add new users and manage existing accounts</p>
       </div>
 
-      <div className="cards-grid">
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">➕ Create New User</h2>
+      {/* Add New User Card */}
+      <div className="card card-full-width">
+        <div className="card-header">
+          <h2 className="card-title">➕ Add New User</h2>
+          <button onClick={fetchUsers} className="btn btn-primary btn-sm">
+            🔄 Refresh
+          </button>
+        </div>
+        <form onSubmit={handleCreateUser} className="user-form">
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Username *</label>
+              <input
+                type="text"
+                className="form-control"
+                value={newUser.username}
+                onChange={(e) => setNewUser({...newUser, username: e.target.value})}
+                required
+                placeholder="Enter username"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Password *</label>
+              <input
+                type="password"
+                className="form-control"
+                value={newUser.password}
+                onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                required
+                placeholder="Enter password"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Role *</label>
+              <select
+                className="form-control"
+                value={newUser.role}
+                onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+              >
+                <option value="student">Student</option>
+                <option value="faculty">Faculty</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Reference ID *</label>
+              <input
+                type="text"
+                className="form-control"
+                value={newUser.referenceId}
+                onChange={(e) => setNewUser({...newUser, referenceId: e.target.value})}
+                required
+                placeholder="PRN/Faculty ID"
+              />
+            </div>
           </div>
-          <form onSubmit={handleCreateUser} className="user-form">
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Username *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={newUser.username}
-                  onChange={(e) => setNewUser({...newUser, username: e.target.value})}
-                  required
-                  placeholder="Enter username"
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Password *</label>
-                <input
-                  type="password"
-                  className="form-control"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-                  required
-                  placeholder="Enter password"
-                />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Role *</label>
-                <select
-                  className="form-control"
-                  value={newUser.role}
-                  onChange={(e) => setNewUser({...newUser, role: e.target.value})}
-                >
-                  <option value="student">Student</option>
-                  <option value="faculty">Faculty</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Reference ID *</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={newUser.referenceId}
-                  onChange={(e) => setNewUser({...newUser, referenceId: e.target.value})}
-                  required
-                  placeholder="PRN for students, Faculty ID for faculty"
-                />
-              </div>
-            </div>
-            <button type="submit" className="btn btn-success">
-              Create User
-            </button>
-          </form>
+          <button type="submit" className="btn btn-success">
+            ➕ Create User
+          </button>
+        </form>
+      </div>
+
+      {/* User Summary Cards */}
+      <div className="users-summary-grid">
+        <div 
+          className="user-summary-card"
+          onClick={() => setSelectedUserType('student')}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="summary-icon">🎓</div>
+          <h3>Students</h3>
+          <p className="summary-count">{studentUsers.length}</p>
+          <p className="summary-subtitle">Click to view</p>
         </div>
 
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">👥 System Users ({users.length})</h2>
-            <button onClick={fetchUsers} className="btn btn-primary">
-              🔄 Refresh
-            </button>
-          </div>
-          {loading ? (
-            <div className="loading-state">
-              <div className="spinner"></div>
-              Loading users...
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Username</th>
-                    <th>Role</th>
-                    <th>Reference ID</th>
-                    <th>Last Login</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <tr key={user._id}>
-                      <td>{user.username}</td>
-                      <td>
-                        <span className={`role-badge ${user.role}`}>
-                          {user.role}
-                        </span>
-                      </td>
-                      <td>{user.referenceId}</td>
-                      <td>{user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}</td>
-                      <td>
-                        <span className={`status-badge ${user.isActive ? 'active' : 'inactive'}`}>
-                          {user.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td>
-                        <button 
-                          onClick={() => handleDeleteUser(user._id)}
-                          className="btn-delete"
-                        >
-                          🗑️
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <div 
+          className="user-summary-card"
+          onClick={() => setSelectedUserType('faculty')}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="summary-icon">👨‍🏫</div>
+          <h3>Faculty</h3>
+          <p className="summary-count">{facultyUsers.length}</p>
+          <p className="summary-subtitle">Click to view</p>
+        </div>
+
+        <div 
+          className="user-summary-card"
+          onClick={() => setSelectedUserType('admin')}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="summary-icon">⚙️</div>
+          <h3>Admins</h3>
+          <p className="summary-count">{adminUsers.length}</p>
+          <p className="summary-subtitle">Click to view</p>
         </div>
       </div>
     </div>
   );
+
+  const DetailView = () => {
+    const typeConfig = {
+      student: { title: 'Students', icon: '🎓', data: studentUsers },
+      faculty: { title: 'Faculty', icon: '👨‍🏫', data: facultyUsers },
+      admin: { title: 'Admins', icon: '⚙️', data: adminUsers }
+    };
+
+    const config = typeConfig[selectedUserType];
+
+    return (
+      <div>
+        <div className="section-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <button 
+              onClick={() => setSelectedUserType(null)}
+              className="btn btn-primary btn-sm"
+            >
+              ← Back
+            </button>
+            <h1>{config.icon} {config.title} Users</h1>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="loading-state">
+            <div className="spinner"></div>
+            Loading users...
+          </div>
+        ) : (
+          <UserTable title={config.title} icon={config.icon} data={config.data} />
+        )}
+      </div>
+    );
+  };
+
+  return selectedUserType ? <DetailView /> : <SummaryView />;
 };
 
 // Main Admin Dashboard Component
@@ -2418,7 +2490,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/notifications/unread/count', {
+        const response = await axios.get(`${API_BASE_URL}/api/notifications/unread/count`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         setUnreadCount(response.data.unreadCount || 0);
@@ -2566,7 +2638,7 @@ const AdminDashboard = () => {
             // Refresh unread count after closing
             const fetchUnreadCount = async () => {
               try {
-                const response = await axios.get('http://localhost:5000/api/notifications/unread/count', {
+                const response = await axios.get(`${API_BASE_URL}/api/notifications/unread/count`, {
                   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                 });
                 setUnreadCount(response.data.unreadCount || 0);
@@ -2580,7 +2652,7 @@ const AdminDashboard = () => {
             // Refresh unread count when a notification is marked as read
             const fetchUnreadCount = async () => {
               try {
-                const response = await axios.get('http://localhost:5000/api/notifications/unread/count', {
+                const response = await axios.get(`${API_BASE_URL}/api/notifications/unread/count`, {
                   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                 });
                 setUnreadCount(response.data.unreadCount || 0);
