@@ -3,6 +3,8 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
+const localStorage = window.sessionStorage;
+
 const DataDisplay = () => {
   const { user } = useAuth();
   const { theme } = useTheme();

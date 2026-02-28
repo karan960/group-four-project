@@ -19,6 +19,8 @@ import {
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import './AdminDashboard.css';
 
+const localStorage = window.sessionStorage;
+
 // Register ChartJS components
 ChartJS.register(
   CategoryScale,
@@ -188,27 +190,60 @@ const DashboardOverview = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const REFRESH_INTERVAL = 10000;
+
+  const toYearWiseStudents = (byYear = {}) => ({
+    First: byYear.First || byYear['First Year'] || byYear['1'] || byYear[1] || byYear['I'] || 0,
+    Second: byYear.Second || byYear['Second Year'] || byYear['2'] || byYear[2] || byYear['II'] || 0,
+    Third: byYear.Third || byYear['Third Year'] || byYear['3'] || byYear[3] || byYear['III'] || 0,
+    Fourth: byYear.Fourth || byYear['Fourth Year'] || byYear['4'] || byYear[4] || byYear['IV'] || 0
+  });
 
   useEffect(() => {
-    fetchDashboardStats();
+    fetchDashboardStats(true);
+
+    const intervalId = setInterval(() => {
+      fetchDashboardStats(false);
+    }, REFRESH_INTERVAL);
+
+    return () => clearInterval(intervalId);
   }, []);
 
-  const fetchDashboardStats = async () => {
+  const fetchDashboardStats = async (showLoader = false) => {
     try {
-      setLoading(true);
+      if (showLoader) {
+        setLoading(true);
+      }
       const token = localStorage.getItem('token');
-      
-      const response = await axios.get('http://localhost:5000/api/dashboard/admin/dashboard', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
 
-      setStats(response.data);
+      const [overviewResponse, dashboardResponse] = await Promise.all([
+        axios.get('http://localhost:5000/api/dashboard/admin/overview', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        axios.get('http://localhost:5000/api/dashboard/admin/dashboard', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+
+      const overviewStats = overviewResponse.data?.stats || {};
+      const studentStats = dashboardResponse.data?.studentStats || {};
+
+      setStats({
+        totalStudents: Number(overviewStats.totalStudents ?? studentStats.total ?? 0),
+        totalFaculty: Number(overviewStats.totalFaculty ?? dashboardResponse.data?.facultyStats?.total ?? 0),
+        totalUsers: Number(overviewStats.totalUsers ?? 0),
+        mlAccuracy: 85.5,
+        yearWiseStudents: toYearWiseStudents(studentStats.byYear || {})
+      });
+      setError('');
     } catch (error) {
       console.error('Error fetching stats:', error);
       // Fallback to direct counting if admin stats endpoint fails
       await fetchStatsFallback();
     } finally {
-      setLoading(false);
+      if (showLoader) {
+        setLoading(false);
+      }
     }
   };
 
@@ -227,22 +262,43 @@ const DashboardOverview = () => {
         })
       ]);
 
+      const studentsData = Array.isArray(studentsRes.data)
+        ? studentsRes.data
+        : Array.isArray(studentsRes.data?.students)
+          ? studentsRes.data.students
+          : [];
+
+      const facultyData = Array.isArray(facultyRes.data)
+        ? facultyRes.data
+        : Array.isArray(facultyRes.data?.faculty)
+          ? facultyRes.data.faculty
+          : [];
+
+      const usersData = Array.isArray(usersRes.data)
+        ? usersRes.data
+        : Array.isArray(usersRes.data?.users)
+          ? usersRes.data.users
+          : [];
+
       const yearWiseCounts = { First: 0, Second: 0, Third: 0, Fourth: 0 };
-      studentsRes.data.forEach(student => {
+      studentsData.forEach(student => {
         if (yearWiseCounts.hasOwnProperty(student.year)) {
           yearWiseCounts[student.year]++;
         }
       });
 
       setStats({
-        totalStudents: studentsRes.data.length,
-        totalFaculty: facultyRes.data.length,
-        totalUsers: usersRes.data.length,
+        totalStudents: studentsData.length,
+        totalFaculty: facultyData.length,
+        totalUsers: usersData.length,
         mlAccuracy: 85.5,
         yearWiseStudents: yearWiseCounts
       });
+      setError('');
     } catch (error) {
       setError('Failed to load dashboard data: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -2390,6 +2446,15 @@ const AdminDashboard = () => {
       {/* Sidebar */}
       <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
+          <button 
+            className="sidebar-toggle"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? '☰' : '◀'}
+          </button>
+
           <div className="sidebar-logo">
             <div className="logo-icon">🎓</div>
             {!sidebarCollapsed && (
@@ -2400,14 +2465,6 @@ const AdminDashboard = () => {
             )}
           </div>
         </div>
-        
-        <button 
-          className="sidebar-toggle"
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-        >
-          {sidebarCollapsed ? '→' : '←'}
-        </button>
         
         <nav className="sidebar-nav">
           {navigation.map((item) => (

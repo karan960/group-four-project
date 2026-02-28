@@ -19,7 +19,7 @@ export const ThemeProvider = ({ children }) => {
   // Helper to call backend theme API when logged in
   const saveThemeToServer = async (newTheme) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       if (!token) return;
       await fetch('http://localhost:5000/api/auth/theme', {
         method: 'PUT',
@@ -39,7 +39,7 @@ export const ThemeProvider = ({ children }) => {
   useEffect(() => {
     const init = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         if (!token) return; // no user logged in
         const res = await fetch('http://localhost:5000/api/auth/theme', {
           headers: { Authorization: `Bearer ${token}` }

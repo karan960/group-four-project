@@ -3,6 +3,8 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import './NotificationCenter.css';
 
+const localStorage = window.sessionStorage;
+
 const NotificationCenter = ({ onClose, onNotificationRead }) => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('inbox'); // 'inbox', 'sent', 'send-new'

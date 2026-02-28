@@ -4,6 +4,8 @@ import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import './AdminDashboard.css';
 
+const localStorage = window.sessionStorage;
+
 const DatabaseManagement = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();

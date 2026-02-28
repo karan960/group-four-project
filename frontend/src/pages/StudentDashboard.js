@@ -18,6 +18,8 @@ import {
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import './StudentDashboard.css';
 
+const localStorage = window.sessionStorage;
+
 // Register ChartJS components
 ChartJS.register(
   CategoryScale,
@@ -32,7 +34,7 @@ ChartJS.register(
 );
 
 // Profile Dropdown Component
-const ProfileDropdown = ({ onSettingsClick }) => {
+const ProfileDropdown = ({ onSettingsClick, onViewProfile }) => {
   const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -65,7 +67,7 @@ const ProfileDropdown = ({ onSettingsClick }) => {
               className="profile-btn"
               onClick={() => {
                 setIsOpen(false);
-                // Will be used for full profile view later
+                onViewProfile();
               }}
             >
               👤 View Profile
@@ -92,6 +94,7 @@ const ProfileDropdown = ({ onSettingsClick }) => {
 const StudentDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [studentData, setStudentData] = useState(null);
   const [performance, setPerformance] = useState(null);
   const [attendance, setAttendance] = useState(null);
@@ -99,6 +102,7 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfileDetails, setShowProfileDetails] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [courses, setCourses] = useState([]);
   const [assignments, setAssignments] = useState([]);
@@ -160,6 +164,12 @@ const StudentDashboard = () => {
       });
     }
     setShowSettingsModal(true);
+  };
+
+  const handleViewProfile = () => {
+    setShowProfileDetails(true);
+    setActiveTab('Dashboard');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleProfileChangeRequest = async (e) => {
@@ -509,10 +519,19 @@ const StudentDashboard = () => {
   }
 
   return (
-    <div className="student-dashboard">
+    <div className={`student-dashboard ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       {/* Sidebar */}
   <div className="sidebar">
         <div className="sidebar-header">
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isSidebarCollapsed ? '☰' : '◀'}
+          </button>
           <div className="sidebar-logo">
             <div className="logo-icon">🎓</div>
             <div className="logo-text">
@@ -527,44 +546,92 @@ const StudentDashboard = () => {
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'Dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Dashboard')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('Dashboard')}
-          >📊 Dashboard</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Dashboard');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Dashboard');
+              }
+            }}
+          ><span className="nav-icon">📊</span><span className="nav-label">Dashboard</span></a>
           <a
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'Courses' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Courses')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('Courses')}
-          >📚 My Courses</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Courses');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Courses');
+              }
+            }}
+          ><span className="nav-icon">📚</span><span className="nav-label">My Courses</span></a>
           <a
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'Assignments' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Assignments')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('Assignments')}
-          >📝 Assignments</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Assignments');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Assignments');
+              }
+            }}
+          ><span className="nav-icon">📝</span><span className="nav-label">Assignments</span></a>
           <a
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'Schedule' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Schedule')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('Schedule')}
-          >📅 Schedule</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Schedule');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Schedule');
+              }
+            }}
+          ><span className="nav-icon">📅</span><span className="nav-label">Schedule</span></a>
           <a
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'Placements' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Placements')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('Placements')}
-          >💼 Placements</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Placements');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Placements');
+              }
+            }}
+          ><span className="nav-icon">💼</span><span className="nav-label">Placements</span></a>
           <a
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'Results' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Results')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('Results')}
-          >📋 Results</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Results');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Results');
+              }
+            }}
+          ><span className="nav-icon">📋</span><span className="nav-label">Results</span></a>
         </nav>
         
         <div className="sidebar-footer">
@@ -625,7 +692,7 @@ const StudentDashboard = () => {
               >
                 🏠 Home
               </button>
-              <ProfileDropdown onSettingsClick={handleOpenSettings} />
+              <ProfileDropdown onSettingsClick={handleOpenSettings} onViewProfile={handleViewProfile} />
             </div>
           </div>
         </header>
@@ -635,53 +702,6 @@ const StudentDashboard = () => {
           {/* Render different content depending on activeTab */}
           {activeTab === 'Dashboard' ? (
             <>
-              {/* Student Profile Card */}
-              <div className="card">
-                <div className="card-header">
-                  <h2 className="card-title">👤 Student Profile</h2>
-                </div>
-                <div className="card-body">
-                  {studentData && (
-                    <div className="profile-grid">
-                      <div className="profile-item">
-                        <label>Name:</label>
-                        <span>{studentData.studentName}</span>
-                      </div>
-                      <div className="profile-item">
-                        <label>PRN:</label>
-                        <span>{studentData.prn}</span>
-                      </div>
-                      <div className="profile-item">
-                        <label>Roll No:</label>
-                        <span>{studentData.rollNo}</span>
-                      </div>
-                      <div className="profile-item">
-                        <label>Year:</label>
-                        <span className={`year-badge ${studentData.year.toLowerCase()}`}>
-                          {studentData.year} Year
-                        </span>
-                      </div>
-                      <div className="profile-item">
-                        <label>Branch:</label>
-                        <span>{studentData.branch}</span>
-                      </div>
-                      <div className="profile-item">
-                        <label>Division:</label>
-                        <span>{studentData.division}</span>
-                      </div>
-                      <div className="profile-item">
-                        <label>Email:</label>
-                        <span>{studentData.email}</span>
-                      </div>
-                      <div className="profile-item">
-                        <label>Mobile:</label>
-                        <span>{studentData.mobileNo}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
               {/* Statistics Cards */}
               <div className="stats-grid">
                 <div className="stat-card">
@@ -1123,6 +1143,69 @@ const StudentDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Settings Modal */}
+      {showProfileDetails && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200,
+            padding: '1rem'
+          }}
+        >
+          <div className="card" style={{ width: '100%', maxWidth: '760px', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 className="card-title">👤 Student Profile</h2>
+              <button className="btn btn-secondary" onClick={() => setShowProfileDetails(false)}>✕</button>
+            </div>
+            <div className="card-body">
+              {studentData && (
+                <div className="profile-grid">
+                  <div className="profile-item">
+                    <label>Name:</label>
+                    <span>{studentData.studentName}</span>
+                  </div>
+                  <div className="profile-item">
+                    <label>PRN:</label>
+                    <span>{studentData.prn}</span>
+                  </div>
+                  <div className="profile-item">
+                    <label>Roll No:</label>
+                    <span>{studentData.rollNo}</span>
+                  </div>
+                  <div className="profile-item">
+                    <label>Year:</label>
+                    <span className={`year-badge ${studentData.year.toLowerCase()}`}>
+                      {studentData.year} Year
+                    </span>
+                  </div>
+                  <div className="profile-item">
+                    <label>Branch:</label>
+                    <span>{studentData.branch}</span>
+                  </div>
+                  <div className="profile-item">
+                    <label>Division:</label>
+                    <span>{studentData.division}</span>
+                  </div>
+                  <div className="profile-item">
+                    <label>Email:</label>
+                    <span>{studentData.email}</span>
+                  </div>
+                  <div className="profile-item">
+                    <label>Mobile:</label>
+                    <span>{studentData.mobileNo}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Settings Modal */}
       {showSettingsModal && (

@@ -1,6 +1,6 @@
 
 
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext();
@@ -12,31 +12,49 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const activeVerifyRequestId = useRef(0);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      verifyToken();
+      verifyToken(token);
     } else {
       setLoading(false);
     }
   }, []);
 
-  const verifyToken = async () => {
+  const verifyToken = async (tokenToVerify) => {
+    const requestId = ++activeVerifyRequestId.current;
+
     try {
-      const response = await axios.get('http://localhost:5000/api/auth/profile');
-      setUser(response.data.user);
+      const response = await axios.get('http://localhost:5000/api/auth/profile', {
+        headers: { Authorization: `Bearer ${tokenToVerify}` }
+      });
+
+      if (requestId === activeVerifyRequestId.current) {
+        setUser(response.data.user);
+      }
     } catch (error) {
-      localStorage.removeItem('token');
-      delete axios.defaults.headers.common['Authorization'];
+      if (requestId === activeVerifyRequestId.current) {
+        sessionStorage.removeItem('token');
+        delete axios.defaults.headers.common['Authorization'];
+        setUser(null);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === activeVerifyRequestId.current) {
+        setLoading(false);
+      }
     }
   };
 
   const login = async (username, password) => {
     try {
+      // Reset any previous session before attempting a new login
+      sessionStorage.removeItem('token');
+      delete axios.defaults.headers.common['Authorization'];
+      setUser(null);
+
       const response = await axios.post('http://localhost:5000/api/auth/login', {
         username,
         password
@@ -44,7 +62,7 @@ export const AuthProvider = ({ children }) => {
 
       const { token, user } = response.data;
       
-      localStorage.setItem('token', token);
+      sessionStorage.setItem('token', token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(user);
       
@@ -58,7 +76,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);
   };

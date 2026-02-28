@@ -24,11 +24,32 @@
   position: fixed;
   height: 100vh;
   z-index: 1000;
+  transition: width 0.25s ease;
+}
+
+.student-dashboard.sidebar-collapsed .sidebar {
+  width: 88px;
 }
 
 /* Sidebar header/logo alignment improvements */
 .student-dashboard .sidebar-header {
   padding: 1.75rem 1.25rem;
+}
+
+.student-dashboard .sidebar-toggle {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--on-primary);
+  cursor: pointer;
+  margin-bottom: 0.9rem;
+  transition: background 0.2s ease;
+}
+
+.student-dashboard .sidebar-toggle:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .student-dashboard .sidebar-logo {
@@ -109,6 +130,11 @@
   padding-left: 1.5rem;
 }
 
+.student-dashboard .nav-icon {
+  font-size: 1rem;
+  margin-right: 0.75rem;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -179,6 +205,31 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  transition: margin-left 0.25s ease;
+}
+
+.student-dashboard.sidebar-collapsed .main-content {
+  margin-left: 88px;
+}
+
+.student-dashboard.sidebar-collapsed .logo-text,
+.student-dashboard.sidebar-collapsed .nav-label,
+.student-dashboard.sidebar-collapsed .sidebar-footer {
+  display: none;
+}
+
+.student-dashboard.sidebar-collapsed .sidebar-nav .nav-item {
+  justify-content: center;
+  padding-left: 0;
+  border-left: none;
+}
+
+.student-dashboard.sidebar-collapsed .nav-item.active {
+  border-left-color: transparent;
+}
+
+.student-dashboard.sidebar-collapsed .nav-icon {
+  margin-right: 0;
 }
 
 .main-header {

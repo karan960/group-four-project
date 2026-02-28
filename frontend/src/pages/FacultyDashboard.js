@@ -18,6 +18,8 @@ import {
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import './FacultyDashboard.css';
 
+const localStorage = window.sessionStorage;
+
 // Register ChartJS components
 ChartJS.register(
   CategoryScale,
@@ -32,7 +34,7 @@ ChartJS.register(
 );
 
 // Profile Dropdown Component
-const ProfileDropdown = () => {
+const ProfileDropdown = ({ onViewProfile, onOpenSettings }) => {
   const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -61,10 +63,22 @@ const ProfileDropdown = () => {
           </div>
           
           <div className="profile-actions">
-            <button className="profile-btn">
+            <button
+              className="profile-btn"
+              onClick={() => {
+                setIsOpen(false);
+                onViewProfile();
+              }}
+            >
               👤 View Profile
             </button>
-            <button className="profile-btn">
+            <button
+              className="profile-btn"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenSettings();
+              }}
+            >
               ⚙️ Settings
             </button>
             <button onClick={logout} className="profile-btn logout">
@@ -80,10 +94,14 @@ const ProfileDropdown = () => {
 const FacultyDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [facultyData, setFacultyData] = useState(null);
   const [teachingData, setTeachingData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Dashboard');
+  const [showProfileDetails, setShowProfileDetails] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('profile');
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [courses, setCourses] = useState([]);
@@ -110,6 +128,116 @@ const FacultyDashboard = () => {
   });
   const [submissions, setSubmissions] = useState([]);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState('');
+  const [profileChangeForm, setProfileChangeForm] = useState({});
+  const [passwordChangeForm, setPasswordChangeForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [submitStatus, setSubmitStatus] = useState('');
+
+  const handleViewProfile = () => {
+    setShowProfileDetails(true);
+    setActiveTab('Dashboard');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenSettings = () => {
+    if (facultyData) {
+      setProfileChangeForm({
+        facultyName: facultyData.facultyName || '',
+        email: facultyData.email || '',
+        mobileNo: facultyData.mobileNo || '',
+        department: facultyData.department || '',
+        designation: facultyData.designation || ''
+      });
+    }
+    setShowSettingsModal(true);
+  };
+
+  const handleProfileChangeRequest = async (e) => {
+    e.preventDefault();
+    try {
+      setSubmitStatus('Submitting...');
+      const token = localStorage.getItem('token');
+
+      await axios.post(
+        'http://localhost:5000/api/change-requests/profile',
+        {
+          facultyId: user.referenceId,
+          requestedBy: user.username,
+          requesterRole: 'faculty',
+          changeType: 'profile',
+          currentData: {
+            facultyName: facultyData?.facultyName,
+            email: facultyData?.email,
+            mobileNo: facultyData?.mobileNo,
+            department: facultyData?.department,
+            designation: facultyData?.designation
+          },
+          requestedData: profileChangeForm
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setSubmitStatus('✅ Profile change request submitted! Waiting for admin approval.');
+      setTimeout(() => {
+        setSubmitStatus('');
+        setShowSettingsModal(false);
+      }, 3000);
+    } catch (error) {
+      setSubmitStatus('❌ Error: ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const handlePasswordChangeRequest = async (e) => {
+    e.preventDefault();
+
+    if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
+      setSubmitStatus('❌ New passwords do not match!');
+      return;
+    }
+
+    if (passwordChangeForm.newPassword.length < 6) {
+      setSubmitStatus('❌ Password must be at least 6 characters long!');
+      return;
+    }
+
+    try {
+      setSubmitStatus('Submitting...');
+      const token = localStorage.getItem('token');
+
+      await axios.post(
+        'http://localhost:5000/api/change-requests/password',
+        {
+          facultyId: user.referenceId,
+          requestedBy: user.username,
+          requesterRole: 'faculty',
+          changeType: 'password',
+          currentPassword: passwordChangeForm.currentPassword,
+          newPassword: passwordChangeForm.newPassword
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setSubmitStatus('✅ Password change request submitted! Waiting for admin approval.');
+      setPasswordChangeForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      setTimeout(() => {
+        setSubmitStatus('');
+        setShowSettingsModal(false);
+      }, 3000);
+    } catch (error) {
+      setSubmitStatus('❌ Error: ' + (error.response?.data?.message || error.message));
+    }
+  };
 
   // Fetch unread notification count
   useEffect(() => {
@@ -409,10 +537,19 @@ const FacultyDashboard = () => {
   }
 
   return (
-    <div className="faculty-dashboard">
+    <div className={`faculty-dashboard ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       {/* Sidebar */}
       <div className="sidebar">
         <div className="sidebar-header">
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isSidebarCollapsed ? '☰' : '◀'}
+          </button>
           <div className="sidebar-logo">
             <div className="logo-icon">🎓</div>
             <div className="logo-text">
@@ -427,58 +564,122 @@ const FacultyDashboard = () => {
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'Dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Dashboard')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('Dashboard')}
-          >📊 Dashboard</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Dashboard');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Dashboard');
+              }
+            }}
+          ><span className="nav-icon">📊</span><span className="nav-label">Dashboard</span></a>
           <a
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'Subjects' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Subjects')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('Subjects')}
-          >📚 My Subjects</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Subjects');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Subjects');
+              }
+            }}
+          ><span className="nav-icon">📚</span><span className="nav-label">My Subjects</span></a>
           <a
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'Courses' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Courses')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('Courses')}
-          >📘 Courses</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Courses');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Courses');
+              }
+            }}
+          ><span className="nav-icon">📘</span><span className="nav-label">Courses</span></a>
           <a
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'Assignments' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Assignments')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('Assignments')}
-          >📝 Assignments</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Assignments');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Assignments');
+              }
+            }}
+          ><span className="nav-icon">📝</span><span className="nav-label">Assignments</span></a>
           <a
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'MarkAttendance' ? 'active' : ''}`}
-            onClick={() => setActiveTab('MarkAttendance')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('MarkAttendance')}
-          >📝 Mark Attendance</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('MarkAttendance');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('MarkAttendance');
+              }
+            }}
+          ><span className="nav-icon">📝</span><span className="nav-label">Mark Attendance</span></a>
           <a
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'EnterMarks' ? 'active' : ''}`}
-            onClick={() => setActiveTab('EnterMarks')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('EnterMarks')}
-          >📋 Enter Marks</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('EnterMarks');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('EnterMarks');
+              }
+            }}
+          ><span className="nav-icon">📋</span><span className="nav-label">Enter Marks</span></a>
           <a
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'Students' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Students')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('Students')}
-          >👥 Students</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Students');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Students');
+              }
+            }}
+          ><span className="nav-icon">👥</span><span className="nav-label">Students</span></a>
           <a
             role="button"
             tabIndex={0}
             className={`nav-item ${activeTab === 'Timetable' ? 'active' : ''}`}
-            onClick={() => setActiveTab('Timetable')}
-            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('Timetable')}
-          >📅 Timetable</a>
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Timetable');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Timetable');
+              }
+            }}
+          ><span className="nav-icon">📅</span><span className="nav-label">Timetable</span></a>
         </nav>
         
         <div className="sidebar-footer">
@@ -539,7 +740,7 @@ const FacultyDashboard = () => {
               >
                 🏠 Home
               </button>
-              <ProfileDropdown />
+              <ProfileDropdown onViewProfile={handleViewProfile} onOpenSettings={handleOpenSettings} />
             </div>
           </div>
         </header>
@@ -548,43 +749,6 @@ const FacultyDashboard = () => {
         <div className="page-content">
           {activeTab === 'Dashboard' ? (
             <>
-              {/* Faculty Profile Card */}
-              <div className="card">
-                <div className="card-header">
-                  <h2 className="card-title">👤 Faculty Profile</h2>
-                </div>
-                <div className="card-body">
-                  {facultyData && (
-                    <div className="profile-grid">
-                      <div className="profile-item">
-                        <label>Name:</label>
-                        <span>{facultyData.facultyName}</span>
-                      </div>
-                      <div className="profile-item">
-                        <label>Faculty ID:</label>
-                        <span>{facultyData.facultyId}</span>
-                      </div>
-                      <div className="profile-item">
-                        <label>Designation:</label>
-                        <span>{facultyData.designation}</span>
-                      </div>
-                      <div className="profile-item">
-                        <label>Department:</label>
-                        <span>{facultyData.department}</span>
-                      </div>
-                      <div className="profile-item">
-                        <label>Email:</label>
-                        <span>{facultyData.email}</span>
-                      </div>
-                      <div className="profile-item">
-                        <label>Mobile:</label>
-                        <span>{facultyData.mobileNo}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
               {/* Statistics Cards */}
               <div className="stats-grid">
                 <div className="stat-card">
@@ -1080,6 +1244,229 @@ const FacultyDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Notification Center Modal */}
+      {showProfileDetails && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1200,
+            padding: '1rem'
+          }}
+        >
+          <div className="card" style={{ width: '100%', maxWidth: '760px', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 className="card-title">👤 Faculty Profile</h2>
+              <button className="btn btn-secondary" onClick={() => setShowProfileDetails(false)}>✕</button>
+            </div>
+            <div className="card-body">
+              {facultyData && (
+                <div className="profile-grid">
+                  <div className="profile-item">
+                    <label>Name:</label>
+                    <span>{facultyData.facultyName}</span>
+                  </div>
+                  <div className="profile-item">
+                    <label>Faculty ID:</label>
+                    <span>{facultyData.facultyId}</span>
+                  </div>
+                  <div className="profile-item">
+                    <label>Designation:</label>
+                    <span>{facultyData.designation}</span>
+                  </div>
+                  <div className="profile-item">
+                    <label>Department:</label>
+                    <span>{facultyData.department}</span>
+                  </div>
+                  <div className="profile-item">
+                    <label>Email:</label>
+                    <span>{facultyData.email}</span>
+                  </div>
+                  <div className="profile-item">
+                    <label>Mobile:</label>
+                    <span>{facultyData.mobileNo}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Center Modal */}
+      {showSettingsModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h3>⚙️ Settings</h3>
+              <button onClick={() => setShowSettingsModal(false)} className="btn-close">×</button>
+            </div>
+
+            <div className="settings-tabs" style={{ display: 'flex', borderBottom: '2px solid var(--border)', marginBottom: '1.5rem' }}>
+              <button
+                className={`settings-tab ${settingsTab === 'profile' ? 'active' : ''}`}
+                onClick={() => setSettingsTab('profile')}
+                style={{
+                  flex: 1,
+                  padding: '1rem',
+                  border: 'none',
+                  background: settingsTab === 'profile' ? 'var(--primary)' : 'transparent',
+                  color: settingsTab === 'profile' ? '#fff' : 'var(--text)',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  transition: 'all 0.3s'
+                }}
+              >
+                👤 Profile Details
+              </button>
+              <button
+                className={`settings-tab ${settingsTab === 'password' ? 'active' : ''}`}
+                onClick={() => setSettingsTab('password')}
+                style={{
+                  flex: 1,
+                  padding: '1rem',
+                  border: 'none',
+                  background: settingsTab === 'password' ? 'var(--primary)' : 'transparent',
+                  color: settingsTab === 'password' ? '#fff' : 'var(--text)',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  transition: 'all 0.3s'
+                }}
+              >
+                🔒 Change Password
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {submitStatus && (
+                <div className={`alert ${submitStatus.includes('✅') ? 'alert-success' : submitStatus.includes('❌') ? 'alert-error' : 'alert-info'}`} style={{ marginBottom: '1rem' }}>
+                  {submitStatus}
+                </div>
+              )}
+
+              {settingsTab === 'profile' && (
+                <form onSubmit={handleProfileChangeRequest}>
+                  <div className="form-group">
+                    <label>Full Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={profileChangeForm.facultyName || ''}
+                      onChange={(e) => setProfileChangeForm({ ...profileChangeForm, facultyName: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Email Address *</label>
+                    <input
+                      type="email"
+                      className="form-control"
+                      value={profileChangeForm.email || ''}
+                      onChange={(e) => setProfileChangeForm({ ...profileChangeForm, email: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Mobile Number</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={profileChangeForm.mobileNo || ''}
+                      onChange={(e) => setProfileChangeForm({ ...profileChangeForm, mobileNo: e.target.value })}
+                      placeholder="Enter 10-digit mobile number"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Department</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={profileChangeForm.department || ''}
+                      onChange={(e) => setProfileChangeForm({ ...profileChangeForm, department: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Designation</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={profileChangeForm.designation || ''}
+                      onChange={(e) => setProfileChangeForm({ ...profileChangeForm, designation: e.target.value })}
+                    />
+                  </div>
+                  <div className="alert alert-info" style={{ fontSize: '0.875rem', marginTop: '1rem' }}>
+                    ℹ️ <strong>Note:</strong> Your profile change request will be sent to the admin for approval.
+                  </div>
+                  <div className="modal-footer" style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                    <button type="button" onClick={() => setShowSettingsModal(false)} className="btn btn-secondary">
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary">
+                      Submit Request
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {settingsTab === 'password' && (
+                <form onSubmit={handlePasswordChangeRequest}>
+                  <div className="form-group">
+                    <label>Current Password *</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      value={passwordChangeForm.currentPassword}
+                      onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, currentPassword: e.target.value })}
+                      required
+                      placeholder="Enter your current password"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>New Password *</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      value={passwordChangeForm.newPassword}
+                      onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, newPassword: e.target.value })}
+                      required
+                      placeholder="Enter new password (min 6 characters)"
+                      minLength="6"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Confirm New Password *</label>
+                    <input
+                      type="password"
+                      className="form-control"
+                      value={passwordChangeForm.confirmPassword}
+                      onChange={(e) => setPasswordChangeForm({ ...passwordChangeForm, confirmPassword: e.target.value })}
+                      required
+                      placeholder="Re-enter new password"
+                      minLength="6"
+                    />
+                  </div>
+                  <div className="alert alert-info" style={{ fontSize: '0.875rem', marginTop: '1rem' }}>
+                    ℹ️ <strong>Note:</strong> Your password change request will be sent to the admin for approval.
+                  </div>
+                  <div className="modal-footer" style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                    <button type="button" onClick={() => setShowSettingsModal(false)} className="btn btn-secondary">
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary">
+                      Submit Request
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notification Center Modal */}
       {showNotifications && (
