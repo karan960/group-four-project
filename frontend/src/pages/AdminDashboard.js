@@ -2282,7 +2282,72 @@ const UserManagement = () => {
   const facultyUsers = users.filter(u => u.role === 'faculty');
   const adminUsers = users.filter(u => u.role === 'admin');
 
-  const UserTable = ({ title, icon, data, roleColor }) => (
+  // Form section - rendered separately to maintain focus
+  const renderAddUserForm = () => (
+    <div className="card card-full-width">
+      <div className="card-header">
+        <h2 className="card-title">➕ Add New User</h2>
+        <button onClick={fetchUsers} className="btn btn-primary btn-sm">
+          🔄 Refresh
+        </button>
+      </div>
+      <form onSubmit={handleCreateUser} className="user-form">
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">Username *</label>
+            <input
+              type="text"
+              className="form-control"
+              value={newUser.username}
+              onChange={(e) => setNewUser({...newUser, username: e.target.value})}
+              required
+              placeholder="Enter username"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Password *</label>
+            <input
+              type="password"
+              className="form-control"
+              value={newUser.password}
+              onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+              required
+              placeholder="Enter password"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Role *</label>
+            <select
+              className="form-control"
+              value={newUser.role}
+              onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+            >
+              <option value="student">Student</option>
+              <option value="faculty">Faculty</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Reference ID *</label>
+            <input
+              type="text"
+              className="form-control"
+              value={newUser.referenceId}
+              onChange={(e) => setNewUser({...newUser, referenceId: e.target.value})}
+              required
+              placeholder="PRN/Faculty ID"
+            />
+          </div>
+        </div>
+        <button type="submit" className="btn btn-success">
+          ➕ Create User
+        </button>
+      </form>
+    </div>
+  );
+
+  // Render user table
+  const renderUserTable = (title, icon, data) => (
     <div className="card">
       <div className="card-header">
         <h3 className="card-title">{icon} {title} ({data.length})</h3>
@@ -2332,74 +2397,51 @@ const UserManagement = () => {
     </div>
   );
 
-  const SummaryView = () => (
+  // Show detail view when a user type is selected
+  if (selectedUserType) {
+    const typeConfig = {
+      student: { title: 'Students', icon: '🎓', data: studentUsers },
+      faculty: { title: 'Faculty', icon: '👨‍🏫', data: facultyUsers },
+      admin: { title: 'Admins', icon: '⚙️', data: adminUsers }
+    };
+
+    const config = typeConfig[selectedUserType];
+
+    return (
+      <div>
+        <div className="section-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <button 
+              onClick={() => setSelectedUserType(null)}
+              className="btn btn-primary btn-sm"
+            >
+              ← Back
+            </button>
+            <h1>{config.icon} {config.title} Users</h1>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="loading-state">
+            <div className="spinner"></div>
+            Loading users...
+          </div>
+        ) : (
+          renderUserTable(config.title, config.icon, config.data)
+        )}
+      </div>
+    );
+  }
+
+  // Show summary view
+  return (
     <div>
       <div className="section-header">
         <h1>👥 User Management</h1>
         <p>Add new users and manage existing accounts</p>
       </div>
 
-      {/* Add New User Card */}
-      <div className="card card-full-width">
-        <div className="card-header">
-          <h2 className="card-title">➕ Add New User</h2>
-          <button onClick={fetchUsers} className="btn btn-primary btn-sm">
-            🔄 Refresh
-          </button>
-        </div>
-        <form onSubmit={handleCreateUser} className="user-form">
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Username *</label>
-              <input
-                type="text"
-                className="form-control"
-                value={newUser.username}
-                onChange={(e) => setNewUser({...newUser, username: e.target.value})}
-                required
-                placeholder="Enter username"
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Password *</label>
-              <input
-                type="password"
-                className="form-control"
-                value={newUser.password}
-                onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-                required
-                placeholder="Enter password"
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Role *</label>
-              <select
-                className="form-control"
-                value={newUser.role}
-                onChange={(e) => setNewUser({...newUser, role: e.target.value})}
-              >
-                <option value="student">Student</option>
-                <option value="faculty">Faculty</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Reference ID *</label>
-              <input
-                type="text"
-                className="form-control"
-                value={newUser.referenceId}
-                onChange={(e) => setNewUser({...newUser, referenceId: e.target.value})}
-                required
-                placeholder="PRN/Faculty ID"
-              />
-            </div>
-          </div>
-          <button type="submit" className="btn btn-success">
-            ➕ Create User
-          </button>
-        </form>
-      </div>
+      {renderAddUserForm()}
 
       {/* User Summary Cards */}
       <div className="users-summary-grid">
@@ -2438,43 +2480,6 @@ const UserManagement = () => {
       </div>
     </div>
   );
-
-  const DetailView = () => {
-    const typeConfig = {
-      student: { title: 'Students', icon: '🎓', data: studentUsers },
-      faculty: { title: 'Faculty', icon: '👨‍🏫', data: facultyUsers },
-      admin: { title: 'Admins', icon: '⚙️', data: adminUsers }
-    };
-
-    const config = typeConfig[selectedUserType];
-
-    return (
-      <div>
-        <div className="section-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button 
-              onClick={() => setSelectedUserType(null)}
-              className="btn btn-primary btn-sm"
-            >
-              ← Back
-            </button>
-            <h1>{config.icon} {config.title} Users</h1>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="loading-state">
-            <div className="spinner"></div>
-            Loading users...
-          </div>
-        ) : (
-          <UserTable title={config.title} icon={config.icon} data={config.data} />
-        )}
-      </div>
-    );
-  };
-
-  return selectedUserType ? <DetailView /> : <SummaryView />;
 };
 
 // Main Admin Dashboard Component
