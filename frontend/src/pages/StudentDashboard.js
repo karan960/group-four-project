@@ -16,6 +16,12 @@ import {
   Legend,
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import {
+  FaGraduationCap, FaChartLine, FaBook, FaClipboardList, FaCog, FaUser,
+  FaBell, FaCheck, FaTimes, FaClock, FaFileAlt, FaDoorOpen, FaBars,
+  FaChevronLeft, FaEdit, FaCalendar, FaBriefcase, FaHome, FaChartBar,
+  FaCheckCircle, FaBullseye, FaClipboard, FaLock
+} from 'react-icons/fa';
 import './StudentDashboard.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;const localStorage = window.sessionStorage;
@@ -70,7 +76,7 @@ const ProfileDropdown = ({ onSettingsClick, onViewProfile }) => {
                 onViewProfile();
               }}
             >
-              👤 View Profile
+              <FaUser /> View Profile
             </button>
             <button 
               className="profile-btn"
@@ -79,10 +85,10 @@ const ProfileDropdown = ({ onSettingsClick, onViewProfile }) => {
                 onSettingsClick();
               }}
             >
-              ⚙️ Settings
+              <FaCog /> Settings
             </button>
             <button onClick={logout} className="profile-btn logout">
-              🚪 Logout
+              <FaDoorOpen /> Logout
             </button>
           </div>
         </div>
@@ -197,14 +203,14 @@ const StudentDashboard = () => {
         }
       );
 
-      setSubmitStatus('✅ Profile change request submitted! Waiting for admin approval.');
+      setSubmitStatus('[OK] Profile change request submitted! Waiting for admin approval.');
       setTimeout(() => {
         setSubmitStatus('');
         setShowSettingsModal(false);
       }, 3000);
     } catch (error) {
       console.error('Profile change request error:', error);
-      setSubmitStatus('❌ Error: ' + (error.response?.data?.message || error.message));
+      setSubmitStatus('[ERR] Error: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -213,12 +219,12 @@ const StudentDashboard = () => {
     
     // Validate passwords
     if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
-      setSubmitStatus('❌ New passwords do not match!');
+      setSubmitStatus('[ERR] New passwords do not match!');
       return;
     }
 
     if (passwordChangeForm.newPassword.length < 6) {
-      setSubmitStatus('❌ Password must be at least 6 characters long!');
+      setSubmitStatus('[ERR] Password must be at least 6 characters long!');
       return;
     }
 
@@ -240,7 +246,7 @@ const StudentDashboard = () => {
         }
       );
 
-      setSubmitStatus('✅ Password change request submitted! Waiting for admin approval.');
+      setSubmitStatus('[OK] Password change request submitted! Waiting for admin approval.');
       setPasswordChangeForm({
         currentPassword: '',
         newPassword: '',
@@ -252,7 +258,7 @@ const StudentDashboard = () => {
       }, 3000);
     } catch (error) {
       console.error('Password change request error:', error);
-      setSubmitStatus('❌ Error: ' + (error.response?.data?.message || error.message));
+      setSubmitStatus('[ERR] Error: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -530,10 +536,10 @@ const StudentDashboard = () => {
             aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {isSidebarCollapsed ? '☰' : '◀'}
+            {isSidebarCollapsed ? <FaBars /> : <FaChevronLeft />}
           </button>
           <div className="sidebar-logo">
-            <div className="logo-icon">🎓</div>
+            <div className="logo-icon"><FaGraduationCap /></div>
             <div className="logo-text">
               <h2>Campus Connect</h2>
               <p>Student Portal</p>
@@ -556,7 +562,7 @@ const StudentDashboard = () => {
                 setActiveTab('Dashboard');
               }
             }}
-          ><span className="nav-icon">📊</span><span className="nav-label">Dashboard</span></a>
+          ><span className="nav-icon"><FaChartLine /></span><span className="nav-label">Dashboard</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -571,7 +577,7 @@ const StudentDashboard = () => {
                 setActiveTab('Courses');
               }
             }}
-          ><span className="nav-icon">📚</span><span className="nav-label">My Courses</span></a>
+          ><span className="nav-icon"><FaBook /></span><span className="nav-label">My Courses</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -586,7 +592,7 @@ const StudentDashboard = () => {
                 setActiveTab('Assignments');
               }
             }}
-          ><span className="nav-icon">📝</span><span className="nav-label">Assignments</span></a>
+          ><span className="nav-icon"><FaEdit /></span><span className="nav-label">Assignments</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -601,7 +607,7 @@ const StudentDashboard = () => {
                 setActiveTab('Schedule');
               }
             }}
-          ><span className="nav-icon">📅</span><span className="nav-label">Schedule</span></a>
+          ><span className="nav-icon"><FaCalendar /></span><span className="nav-label">Schedule</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -616,7 +622,7 @@ const StudentDashboard = () => {
                 setActiveTab('Placements');
               }
             }}
-          ><span className="nav-icon">💼</span><span className="nav-label">Placements</span></a>
+          ><span className="nav-icon"><FaBriefcase /></span><span className="nav-label">Placements</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -631,7 +637,7 @@ const StudentDashboard = () => {
                 setActiveTab('Results');
               }
             }}
-          ><span className="nav-icon">📋</span><span className="nav-label">Results</span></a>
+          ><span className="nav-icon"><FaFileAlt /></span><span className="nav-label">Results</span></a>
         </nav>
         
         <div className="sidebar-footer">
@@ -663,25 +669,9 @@ const StudentDashboard = () => {
                 className="btn btn-primary"
                 style={{ position: 'relative' }}
               >
-                🔔 Notifications
+                <FaBell /> Notifications
                 {unreadCount > 0 && (
-                  <span 
-                    style={{
-                      position: 'absolute',
-                      top: '-8px',
-                      right: '-8px',
-                      background: '#e74c3c',
-                      color: 'white',
-                      borderRadius: '50%',
-                      width: '24px',
-                      height: '24px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.75rem',
-                      fontWeight: 'bold'
-                    }}
-                  >
+                  <span className="notif-count-badge">
                     {unreadCount}
                   </span>
                 )}
@@ -690,7 +680,7 @@ const StudentDashboard = () => {
                 onClick={() => navigate('/')}
                 className="btn btn-secondary"
               >
-                🏠 Home
+                <FaHome /> Home
               </button>
               <ProfileDropdown onSettingsClick={handleOpenSettings} onViewProfile={handleViewProfile} />
             </div>
@@ -705,21 +695,21 @@ const StudentDashboard = () => {
               {/* Statistics Cards */}
               <div className="stats-grid">
                 <div className="stat-card">
-                  <div className="stat-icon">📊</div>
+                  <div className="stat-icon"><FaChartBar /></div>
                   <div className="stat-info">
                     <h3>{performance?.cgpa || '8.5'}</h3>
                     <p>Current CGPA</p>
                   </div>
                 </div>
                 <div className="stat-card">
-                  <div className="stat-icon">✅</div>
+                  <div className="stat-icon"><FaCheckCircle /></div>
                   <div className="stat-info">
                     <h3>{attendance?.overall || '85'}%</h3>
                     <p>Overall Attendance</p>
                   </div>
                 </div>
                 <div className="stat-card">
-                  <div className="stat-icon">📚</div>
+                  <div className="stat-icon"><FaClipboardList /></div>
                   <div className="stat-info">
                     <h3>6</h3>
                     <p>Subjects</p>
@@ -785,7 +775,7 @@ const StudentDashboard = () => {
               {/* Performance Predictions */}
               <div className="card">
                 <div className="card-header">
-                  <h2 className="card-title">🤖 AI Performance Predictions</h2>
+                  <h2 className="card-title"><FaCog /> AI Performance Predictions</h2>
                 </div>
                 <div className="card-body">
                   <div className="overall-prediction">
@@ -819,7 +809,7 @@ const StudentDashboard = () => {
               {/* Attendance Details */}
               <div className="card">
                 <div className="card-header">
-                  <h2 className="card-title">📅 Attendance Details</h2>
+                  <h2 className="card-title"><FaCalendar /> Attendance Details</h2>
                 </div>
                 <div className="card-body">
                   <div className="attendance-table">
@@ -867,19 +857,19 @@ const StudentDashboard = () => {
                 <h3>Quick Actions</h3>
                 <div className="quick-actions-grid">
                   <button className="quick-action-btn">
-                    <span className="action-icon">📝</span>
+                    <span className="action-icon"><FaEdit /></span>
                     <span>View TimeTable</span>
                   </button>
                   <button className="quick-action-btn">
-                    <span className="action-icon">📋</span>
+                    <span className="action-icon"><FaClipboard /></span>
                     <span>Check Results</span>
                   </button>
                   <button className="quick-action-btn">
-                    <span className="action-icon">💼</span>
+                    <span className="action-icon"><FaBriefcase /></span>
                     <span>Placement Cell</span>
                   </button>
                   <button className="quick-action-btn">
-                    <span className="action-icon">📚</span>
+                    <span className="action-icon"><FaBook /></span>
                     <span>Study Materials</span>
                   </button>
                 </div>
@@ -926,7 +916,7 @@ const StudentDashboard = () => {
                                   rel="noreferrer"
                                   className="stat-label"
                                 >
-                                  📄 View Course PDF
+                                  <FaFileAlt /> View Course PDF
                                 </a>
                               )}
                             </div>
@@ -963,13 +953,13 @@ const StudentDashboard = () => {
                                   rel="noreferrer"
                                   className="confidence-label"
                                 >
-                                  📄 Download Assignment PDF
+                                  <FaFileAlt /> Download Assignment PDF
                                 </a>
                               )}
 
                               {assignment.mySubmission ? (
                                 <div style={{ marginTop: '0.75rem', color: 'var(--success)' }}>
-                                  ✅ Submitted on {new Date(assignment.mySubmission.submittedAt).toLocaleString()}
+                                  <FaCheckCircle /> Submitted on {new Date(assignment.mySubmission.submittedAt).toLocaleString()}
                                 </div>
                               ) : (
                                 <div style={{ marginTop: '1rem' }}>
@@ -1018,7 +1008,7 @@ const StudentDashboard = () => {
                   {activeTab === 'Placements' && (
                     <div>
                       <div className="stat-card" style={{ maxWidth: 420 }}>
-                        <div className="stat-icon">💼</div>
+                        <div className="stat-icon"><FaBriefcase /></div>
                         <div className="stat-info">
                           <h3>Upcoming Drive: TechCorp</h3>
                           <p className="confidence-label">Register before: 01 Dec 2025</p>
@@ -1041,28 +1031,28 @@ const StudentDashboard = () => {
                               {/* Semester Summary */}
                               <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
                                 <div className="stat-card">
-                                  <div className="stat-icon">📊</div>
+                                  <div className="stat-icon"><FaChartBar /></div>
                                   <div className="stat-info">
                                     <h3>{semesterMark.sgpa || 'N/A'}</h3>
                                     <p>SGPA</p>
                                   </div>
                                 </div>
                                 <div className="stat-card">
-                                  <div className="stat-icon">📈</div>
+                                  <div className="stat-icon"><FaChartLine /></div>
                                   <div className="stat-info">
                                     <h3>{semesterMark.cgpa || studentData?.cgpa || 'N/A'}</h3>
                                     <p>CGPA</p>
                                   </div>
                                 </div>
                                 <div className="stat-card">
-                                  <div className="stat-icon">✅</div>
+                                  <div className="stat-icon"><FaCheckCircle /></div>
                                   <div className="stat-info">
                                     <h3>{semesterMark.status || 'Pass'}</h3>
                                     <p>Status</p>
                                   </div>
                                 </div>
                                 <div className="stat-card">
-                                  <div className="stat-icon">🎯</div>
+                                  <div className="stat-icon"><FaBullseye /></div>
                                   <div className="stat-info">
                                     <h3>{semesterMark.totalCredits || 'N/A'}</h3>
                                     <p>Credits</p>
@@ -1130,7 +1120,7 @@ const StudentDashboard = () => {
                         </div>
                       ) : (
                         <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)' }}>
-                          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📋</div>
+                          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}><FaClipboard /></div>
                           <h3>No Results Available</h3>
                           <p>Your semester results will appear here once they are published.</p>
                         </div>
@@ -1160,8 +1150,8 @@ const StudentDashboard = () => {
         >
           <div className="card" style={{ width: '100%', maxWidth: '760px', maxHeight: '85vh', overflowY: 'auto' }}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 className="card-title">👤 Student Profile</h2>
-              <button className="btn btn-secondary" onClick={() => setShowProfileDetails(false)}>✕</button>
+              <h2 className="card-title"><FaUser /> Student Profile</h2>
+              <button className="btn btn-secondary" onClick={() => setShowProfileDetails(false)}><FaTimes /></button>
             </div>
             <div className="card-body">
               {studentData && (
@@ -1212,7 +1202,7 @@ const StudentDashboard = () => {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '600px' }}>
             <div className="modal-header">
-              <h3>⚙️ Settings</h3>
+              <h3><FaCog /> Settings</h3>
               <button onClick={() => setShowSettingsModal(false)} className="btn-close">×</button>
             </div>
             
@@ -1232,7 +1222,7 @@ const StudentDashboard = () => {
                   transition: 'all 0.3s'
                 }}
               >
-                👤 Profile Details
+                <FaUser /> Profile Details
               </button>
               <button
                 className={`settings-tab ${settingsTab === 'password' ? 'active' : ''}`}
@@ -1248,13 +1238,13 @@ const StudentDashboard = () => {
                   transition: 'all 0.3s'
                 }}
               >
-                🔒 Change Password
+                <FaLock /> Change Password
               </button>
             </div>
 
             <div className="modal-body">
               {submitStatus && (
-                <div className={`alert ${submitStatus.includes('✅') ? 'alert-success' : submitStatus.includes('❌') ? 'alert-error' : 'alert-info'}`} style={{ marginBottom: '1rem' }}>
+                <div className={`alert ${submitStatus.includes('[OK]') ? 'alert-success' : submitStatus.includes('[ERR]') ? 'alert-error' : 'alert-info'}`} style={{ marginBottom: '1rem' }}>
                   {submitStatus}
                 </div>
               )}

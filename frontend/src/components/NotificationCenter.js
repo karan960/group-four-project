@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import {
+  FaBell, FaEnvelope, FaEdit, FaCheck, FaTimes, FaExclamationTriangle,
+  FaClock, FaTrash, FaEye, FaUsers, FaBolt, FaClipboard, FaBook, FaBuilding,
+  FaMapMarkerAlt, FaBullhorn, FaSyncAlt
+} from 'react-icons/fa';
 import './NotificationCenter.css';
 
 const localStorage = window.sessionStorage;
@@ -184,7 +189,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
       <div className="notification-modal" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="notification-header">
-          <h2>🔔 Notification Center</h2>
+          <h2><FaBell /> Notification Center</h2>
           <button onClick={onClose} className="btn-close">×</button>
         </div>
 
@@ -201,7 +206,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
             className={`tab-btn ${activeTab === 'inbox' ? 'active' : ''}`}
             onClick={() => setActiveTab('inbox')}
           >
-            📬 Inbox {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+            <FaEnvelope /> Inbox {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
           </button>
           {['admin', 'faculty'].includes(user?.role) && (
             <>
@@ -209,13 +214,13 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                 className={`tab-btn ${activeTab === 'sent' ? 'active' : ''}`}
                 onClick={() => setActiveTab('sent')}
               >
-                📤 Sent
+                <FaEnvelope /> Sent
               </button>
               <button 
                 className={`tab-btn ${activeTab === 'send-new' ? 'active' : ''}`}
                 onClick={() => setActiveTab('send-new')}
               >
-                ✏️ Send New
+                <FaEdit /> Send New
               </button>
             </>
           )}
@@ -232,7 +237,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                   className="btn btn-secondary"
                   style={{ marginBottom: '1rem' }}
                 >
-                  ✅ Mark all as read
+                  <FaCheck /> Mark all as read
                 </button>
               )}
 
@@ -254,10 +259,10 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                       onClick={() => !notif.isRead && markAsRead(notif._id)}
                     >
                       <div className="notification-badge">
-                        {notif.type === 'announcement' && '📢'}
-                        {notif.type === 'alert' && '⚠️'}
-                        {notif.type === 'update' && '📝'}
-                        {notif.type === 'reminder' && '⏰'}
+                        {notif.type === 'announcement' && <FaBullhorn />}
+                        {notif.type === 'alert' && <FaExclamationTriangle />}
+                        {notif.type === 'update' && <FaEdit />}
+                        {notif.type === 'reminder' && <FaClock />}
                       </div>
 
                       <div className="notification-body">
@@ -287,7 +292,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                         className="btn-delete-notif"
                         title="Delete notification"
                       >
-                        🗑️
+                        <FaTrash />
                       </button>
                     </div>
                   ))}
@@ -313,10 +318,10 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                   {notifications.map((notif) => (
                     <div key={notif._id} className="notification-item sent">
                       <div className="notification-badge">
-                        {notif.type === 'announcement' && '📢'}
-                        {notif.type === 'alert' && '⚠️'}
-                        {notif.type === 'update' && '📝'}
-                        {notif.type === 'reminder' && '⏰'}
+                        {notif.type === 'announcement' && <FaBullhorn />}
+                        {notif.type === 'alert' && <FaExclamationTriangle />}
+                        {notif.type === 'update' && <FaEdit />}
+                        {notif.type === 'reminder' && <FaClock />}
                       </div>
 
                       <div className="notification-body">
@@ -331,7 +336,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                             {notif.targetYear && ` (${notif.targetYear})`}
                           </span>
                           <span className="read-count">
-                            👁️ {notif.readBy?.length || 0} read
+                            <FaEye /> {notif.readBy?.length || 0} read
                           </span>
                           <span className="timestamp">
                             {new Date(notif.createdAt).toLocaleString()}
@@ -344,7 +349,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                         className="btn-delete-notif"
                         title="Delete notification"
                       >
-                        🗑️
+                        <FaTrash />
                       </button>
                     </div>
                   ))}
@@ -357,7 +362,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
           {activeTab === 'send-new' && (
             <form onSubmit={handleSendNotification} className="notification-form">
               <div className="form-group">
-                <label>📌 Title *</label>
+                <label><FaClipboard /> Title *</label>
                 <input
                   type="text"
                   className="form-control"
@@ -369,7 +374,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
               </div>
 
               <div className="form-group">
-                <label>💬 Message *</label>
+                <label><FaEdit /> Message *</label>
                 <textarea
                   className="form-control"
                   value={formData.message}
@@ -385,7 +390,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>👥 Send To *</label>
+                  <label><FaUsers /> Send To *</label>
                   <select
                     className="form-control"
                     value={formData.targetRole}
@@ -398,7 +403,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                 </div>
 
                 <div className="form-group">
-                  <label>⚡ Priority</label>
+                  <label><FaBolt /> Priority</label>
                   <select
                     className="form-control"
                     value={formData.priority}
@@ -412,7 +417,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                 </div>
 
                 <div className="form-group">
-                  <label>📝 Type</label>
+                  <label><FaClipboard /> Type</label>
                   <select
                     className="form-control"
                     value={formData.type}
@@ -429,7 +434,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
               {formData.targetRole === 'student' && (
                 <div className="form-row">
                   <div className="form-group">
-                    <label>📚 Year (Optional)</label>
+                    <label><FaBook /> Year (Optional)</label>
                     <select
                       className="form-control"
                       value={formData.targetYear}
@@ -444,7 +449,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                   </div>
 
                   <div className="form-group">
-                    <label>🏛️ Branch (Optional)</label>
+                    <label><FaBuilding /> Branch (Optional)</label>
                     <input
                       type="text"
                       className="form-control"
@@ -455,7 +460,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                   </div>
 
                   <div className="form-group">
-                    <label>📍 Division (Optional)</label>
+                    <label><FaMapMarkerAlt /> Division (Optional)</label>
                     <input
                       type="text"
                       className="form-control"
@@ -473,7 +478,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                   className="btn btn-success"
                   disabled={loading}
                 >
-                  📤 Send Notification
+                  <FaEnvelope /> Send Notification
                 </button>
                 <button 
                   type="button"
@@ -489,7 +494,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
                   })}
                   className="btn btn-secondary"
                 >
-                  🔄 Clear
+                  <FaSyncAlt /> Clear
                 </button>
               </div>
             </form>

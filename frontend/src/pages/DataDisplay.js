@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import {
+  FaChartBar, FaGraduationCap, FaChalkboardTeacher, FaChartLine,
+  FaCheckCircle, FaSearch, FaFileDownload, FaSyncAlt
+} from 'react-icons/fa';
+import './AdminDashboard.css';
 
 const localStorage = window.sessionStorage;
 
@@ -215,11 +220,11 @@ const DataDisplay = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      setCrudMessage('✅ Record deleted successfully!');
+      setCrudMessage('[OK] Record deleted successfully!');
       setTimeout(() => setCrudMessage(''), 3000);
       fetchAllData();
     } catch (error) {
-      setCrudMessage('❌ Error deleting record: ' + (error.response?.data?.message || error.message));
+      setCrudMessage('[ERR] Error deleting record: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -261,12 +266,12 @@ const DataDisplay = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      setCrudMessage('✅ Record updated successfully!');
+      setCrudMessage('[OK] Record updated successfully!');
       setTimeout(() => setCrudMessage(''), 3000);
       setShowEditModal(false);
       fetchAllData();
     } catch (error) {
-      setCrudMessage('❌ Error updating record: ' + (error.response?.data?.message || error.message));
+      setCrudMessage('[ERR] Error updating record: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -279,12 +284,12 @@ const DataDisplay = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      setCrudMessage('✅ Record created successfully!');
+      setCrudMessage('[OK] Record created successfully!');
       setTimeout(() => setCrudMessage(''), 3000);
       setShowEditModal(false);
       fetchAllData();
     } catch (error) {
-      setCrudMessage('❌ Error creating record: ' + (error.response?.data?.message || error.message));
+      setCrudMessage('[ERR] Error creating record: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -465,9 +470,9 @@ const DataDisplay = () => {
   const totalPages = getTotalPages();
 
   return (
-    <div className="admin-section">
-      <div className="section-header">
-        <h2>📊 View Data</h2>
+    <div className="admin-section data-display-page">
+      <div className="section-header dashboard-section-header">
+        <h2><FaChartBar /> View Data</h2>
         <p>Browse and search all system data</p>
       </div>
 
@@ -483,15 +488,15 @@ const DataDisplay = () => {
             }}
             className="form-control"
           >
-            <option value="students">🎓 Students Data</option>
-            <option value="faculty">👨‍🏫 Faculty Data</option>
-            <option value="marks">📈 Marks Data</option>
-            <option value="attendance">✅ Attendance Data</option>
+            <option value="students">Students Data</option>
+            <option value="faculty">Faculty Data</option>
+            <option value="marks">Marks Data</option>
+            <option value="attendance">Attendance Data</option>
           </select>
 
           <input
             type="text"
-            placeholder={`🔍 Search by name, PRN, email...`}
+            placeholder="Search by name, PRN, email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="form-control search-input"
@@ -524,11 +529,11 @@ const DataDisplay = () => {
           </button>
 
           <button onClick={exportToCSV} className="btn btn-info">
-            📥 Export CSV
+            <FaFileDownload /> Export CSV
           </button>
 
           <button onClick={fetchAllData} className="btn btn-secondary">
-            🔄 Refresh
+            <FaSyncAlt /> Refresh
           </button>
         </div>
       </div>
@@ -554,11 +559,15 @@ const DataDisplay = () => {
         <>
           <div className="data-display-section">
             {(activeTab === 'students' || activeTab === 'faculty') && (
-              <button className="btn btn-primary" onClick={handleAddNew} style={{ marginBottom: '20px' }}>
+              <button className="btn btn-primary add-record-btn" onClick={handleAddNew}>
                 + Add New {activeTab === 'students' ? 'Student' : 'Faculty'}
               </button>
             )}
-            {crudMessage && <div className="message" style={{ padding: '10px', marginBottom: '15px', backgroundColor: crudMessage.includes('✅') ? '#d4edda' : '#f8d7da', color: crudMessage.includes('✅') ? '#155724' : '#721c24', borderRadius: '4px' }}>{crudMessage}</div>}
+            {crudMessage && (
+              <div className={`message ${crudMessage.includes('[OK]') ? 'success' : 'error'}`}>
+                {crudMessage}
+              </div>
+            )}
             {activeTab === 'students' && <StudentTable data={paginatedData} />}
             {activeTab === 'faculty' && <FacultyTable data={paginatedData} />}
             {activeTab === 'marks' && <MarksTable data={paginatedData} />}

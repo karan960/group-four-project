@@ -17,6 +17,17 @@ import {
   Legend,
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { 
+  FaGraduationCap, FaChalkboardTeacher, FaUsers, FaCog, FaDatabase, 
+  FaSyncAlt, FaPlus, FaArrowRight, FaEnvelope, FaSearch, FaFolder,
+  FaCheck, FaTimes, FaBell, FaChartLine, FaTachometerAlt, FaRobot,
+  FaFileDownload, FaUpload, FaLock, FaClock, FaClipboardList,
+  FaBook, FaTrash, FaBroom, FaCheckCircle, FaExclamationCircle, FaUser,
+  FaDoorOpen, FaCompass, FaLightbulb, FaSave, FaBolt, FaRocket,
+  FaTools, FaTimesCircle, FaBullseye, FaBrain, FaChartBar,
+  FaExclamationTriangle, FaBars, FaChevronLeft, FaHome,
+  FaEdit
+} from 'react-icons/fa';
 import './AdminDashboard.css';
 
 const localStorage = window.sessionStorage;
@@ -96,7 +107,7 @@ const ProfileDropdown = () => {
               onClick={() => setShowProfileModal(true)}
               className="profile-btn"
             >
-              👤 Edit Profile
+              <FaUser /> Edit Profile
             </button>
             <button 
               onClick={() => {
@@ -105,13 +116,13 @@ const ProfileDropdown = () => {
               }}
               className="profile-btn"
             >
-              ⚙️ Settings
+              <FaCog /> Settings
             </button>
             <button 
               onClick={logout}
               className="profile-btn logout"
             >
-              🚪 Logout
+              <FaDoorOpen /> Logout
             </button>
           </div>
         </div>
@@ -364,28 +375,28 @@ const DashboardOverview = () => {
       {/* Statistics Cards */}
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-icon">🎓</div>
+          <div className="stat-icon"><FaGraduationCap /></div>
           <div className="stat-info">
             <h3>{stats.totalStudents}</h3>
             <p>Total Students</p>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">👨‍🏫</div>
+          <div className="stat-icon"><FaChalkboardTeacher /></div>
           <div className="stat-info">
             <h3>{stats.totalFaculty}</h3>
             <p>Faculty Members</p>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">👥</div>
+          <div className="stat-icon"><FaUsers /></div>
           <div className="stat-info">
             <h3>{stats.totalUsers}</h3>
             <p>Total Users</p>
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">🤖</div>
+          <div className="stat-icon"><FaRobot /></div>
           <div className="stat-info">
             <h3>{stats.mlAccuracy}%</h3>
             <p>ML Model Accuracy</p>
@@ -396,28 +407,28 @@ const DashboardOverview = () => {
       {/* Year-wise Stats */}
       <div className="stats-grid">
         <div className="stat-card year-card first-year">
-          <div className="stat-icon">1️⃣</div>
+          <div className="stat-icon">1</div>
           <div className="stat-info">
             <h3>{stats.yearWiseStudents?.First || 0}</h3>
             <p>First Year Students</p>
           </div>
         </div>
         <div className="stat-card year-card second-year">
-          <div className="stat-icon">2️⃣</div>
+          <div className="stat-icon">2</div>
           <div className="stat-info">
             <h3>{stats.yearWiseStudents?.Second || 0}</h3>
             <p>Second Year Students</p>
           </div>
         </div>
         <div className="stat-card year-card third-year">
-          <div className="stat-icon">3️⃣</div>
+          <div className="stat-icon">3</div>
           <div className="stat-info">
             <h3>{stats.yearWiseStudents?.Third || 0}</h3>
             <p>Third Year Students</p>
           </div>
         </div>
         <div className="stat-card year-card fourth-year">
-          <div className="stat-icon">4️⃣</div>
+          <div className="stat-icon">4</div>
           <div className="stat-info">
             <h3>{stats.yearWiseStudents?.Fourth || 0}</h3>
             <p>Fourth Year Students</p>
@@ -578,7 +589,7 @@ const DataManagement = () => {
       fetchData();
     } catch (error) {
       console.error('Upload error:', error);
-      setUploadStatus('❌ Upload failed: ' + (error.response?.data?.message || error.message));
+      setUploadStatus('[ERR] Upload failed: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -757,12 +768,12 @@ const DataManagement = () => {
       link.click();
       document.body.removeChild(link);
       
-      setQuickActionStatus(`✅ ${reportType} report generated successfully!`);
+      setQuickActionStatus(`[OK] ${reportType} report generated successfully!`);
       setShowReportsModal(false);
       setTimeout(() => setQuickActionStatus(''), 5000);
     } catch (error) {
       console.error('Report generation error:', error);
-      setQuickActionStatus('❌ Error generating report: ' + error.message);
+      setQuickActionStatus('[ERR] Error generating report: ' + error.message);
     }
   };
 
@@ -783,13 +794,13 @@ const DataManagement = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      setQuickActionStatus(`✅ Announcement sent to ${announcementTarget === 'all' ? 'all users' : announcementTarget + 's'}!`);
+      setQuickActionStatus(`[OK] Announcement sent to ${announcementTarget === 'all' ? 'all users' : announcementTarget + 's'}!`);
       setAnnouncement('');
       setShowAnnouncementModal(false);
       setTimeout(() => setQuickActionStatus(''), 5000);
     } catch (error) {
       console.error('Announcement error:', error);
-      setQuickActionStatus(`❌ Error: ${error.response?.data?.message || error.message}`);
+      setQuickActionStatus(`[ERR] Error: ${error.response?.data?.message || error.message}`);
     }
   };
 
@@ -829,11 +840,11 @@ const DataManagement = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      setQuickActionStatus(`✅ Database backup completed successfully! Backup size: ${response.data.size || 'Unknown'}`);
+      setQuickActionStatus(`[OK] Database backup completed successfully! Backup size: ${response.data.size || 'Unknown'}`);
       setTimeout(() => setQuickActionStatus(''), 5000);
     } catch (error) {
       console.error('Backup error:', error);
-      setQuickActionStatus(`⚠️ Backup request sent. Backend will process it. ${error.response?.data?.message || ''}`);
+      setQuickActionStatus(`[WARN] Backup request sent. Backend will process it. ${error.response?.data?.message || ''}`);
       setTimeout(() => setQuickActionStatus(''), 5000);
     }
   };
@@ -905,7 +916,7 @@ const DataManagement = () => {
 
       {/* Quick Actions Status */}
       {quickActionStatus && (
-        <div className={`alert ${quickActionStatus.includes('✅') ? 'alert-success' : quickActionStatus.includes('❌') ? 'alert-error' : 'alert-info'}`}>
+        <div className={`alert ${quickActionStatus.includes('[OK]') ? 'alert-success' : quickActionStatus.includes('[ERR]') ? 'alert-error' : 'alert-info'}`}>
           {quickActionStatus}
         </div>
       )}
@@ -918,28 +929,28 @@ const DataManagement = () => {
             className="quick-action-btn"
             onClick={() => setShowReportsModal(true)}
           >
-            <span className="action-icon">📊</span>
+            <span className="action-icon"><FaChartLine /></span>
             <span>Generate Reports</span>
           </button>
           <button 
             className="quick-action-btn"
             onClick={() => setShowAnnouncementModal(true)}
           >
-            <span className="action-icon">📧</span>
+            <span className="action-icon"><FaEnvelope /></span>
             <span>Send Announcements</span>
           </button>
           <button 
             className="quick-action-btn"
             onClick={handleSystemAudit}
           >
-            <span className="action-icon">🔍</span>
+            <span className="action-icon"><FaSearch /></span>
             <span>System Audit</span>
           </button>
           <button 
             className="quick-action-btn"
             onClick={handleBackupData}
           >
-            <span className="action-icon">📁</span>
+            <span className="action-icon"><FaDatabase /></span>
             <span>Backup Data</span>
           </button>
         </div>
@@ -948,7 +959,7 @@ const DataManagement = () => {
       {/* Excel Upload Section */}
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">📤 Excel Data Upload</h2>
+          <h2 className="card-title"><FaUpload /> Excel Data Upload</h2>
         </div>
         <div className="upload-section">
           <div className="upload-controls">
@@ -982,23 +993,23 @@ const DataManagement = () => {
               id="file-upload"
             />
             <label htmlFor="file-upload" className="btn btn-primary">
-              📁 Choose File
+              <FaFolder /> Choose File
             </label>
             
             <button onClick={downloadTemplate} className="btn btn-warning">
-              📥 Download Template
+              <FaFileDownload /> Download Template
             </button>
             
             <button onClick={handleBulkUpload} className="btn btn-success" disabled={!excelFile}>
-              🚀 Upload Data
+              <FaArrowRight /> Upload Data
             </button>
 
             <button onClick={fetchData} className="btn btn-primary">
-              🔄 Refresh Data
+              <FaSyncAlt /> Refresh Data
             </button>
 
             <button onClick={handleAddNew} className="btn btn-success">
-              ➕ Add New
+              <FaPlus /> Add New
             </button>
           </div>
           
@@ -1009,14 +1020,14 @@ const DataManagement = () => {
           )}
           
           {uploadStatus && (
-            <div className={`alert ${uploadStatus.includes('✅') ? 'alert-success' : uploadStatus.includes('❌') ? 'alert-error' : 'alert-info'}`}>
+            <div className={`alert ${uploadStatus.includes('[OK]') ? 'alert-success' : uploadStatus.includes('[ERR]') ? 'alert-error' : 'alert-info'}`}>
               {uploadStatus}
             </div>
           )}
 
           {/* Column Mapping */}
           <div className="mapping-section">
-            <h4>🧭 Column Mapping (edit to match your sheet headers)</h4>
+            <h4><FaCompass /> Column Mapping (edit to match your sheet headers)</h4>
             <div className="mapping-grid">
               {mappingFields.map((field) => (
                 <div key={field.key} className="mapping-item">
@@ -1040,7 +1051,7 @@ const DataManagement = () => {
 
           {/* Field Documentation */}
           <div className="field-documentation">
-            <h4>📝 Required Fields for {uploadType.charAt(0).toUpperCase() + uploadType.slice(1)}:</h4>
+            <h4><FaEdit /> Required Fields for {uploadType.charAt(0).toUpperCase() + uploadType.slice(1)}:</h4>
             {uploadType === 'students' ? (
               <div className="fields-list">
                 <div><strong>PRN</strong> - Unique Student ID (Required)</div>
@@ -1079,7 +1090,7 @@ const DataManagement = () => {
                   <div><strong>CGPA</strong> - Cumulative GPA (Required)</div>
                 </div>
                 <div className="format-example">
-                  <strong>📝 Example:</strong>
+                  <strong><FaEdit /> Example:</strong>
                   <code>John Doe,PRN001,101,First,18,19,17,20,18,92,73.6,75,78,72,80,77,382,76.4,8.5</code>
                   <div className="example-legend">
                     Name | PRN | Seat | Year | Internal(5@20 each) | IN Total | IN % | External(5@100 each) | EX Total | EX % | CGPA
@@ -1089,7 +1100,7 @@ const DataManagement = () => {
             ) : uploadType === 'attendance' ? (
               <div>
                 <div className="format-badge">
-                  <strong>📋 Current Format:</strong> {dataFormat === 'single' ? 'Single Subject Per Row' : 'Multiple Subjects Per Row'}
+                  <strong><FaClipboardList /> Current Format:</strong> {dataFormat === 'single' ? 'Single Subject Per Row' : 'Multiple Subjects Per Row'}
                 </div>
                 <div className="fields-list">
                   <div><strong>PRN</strong> - Student PRN to link attendance (Required)</div>
@@ -1106,7 +1117,7 @@ const DataManagement = () => {
                       <div><strong>Subject N Name</strong> - Subject name (e.g., Subject 1 Name, Subject 2 Name, etc.)</div>
                       <div><strong>Subject N Total Classes</strong> - Total classes for subject N</div>
                       <div><strong>Subject N Attended</strong> - Attended classes for subject N</div>
-                      <div><strong>💡 Tip:</strong> Add as many subjects as needed (Subject 1, Subject 2, Subject 3...)</div>
+                      <div><strong><FaLightbulb /> Tip:</strong> Add as many subjects as needed (Subject 1, Subject 2, Subject 3...)</div>
                     </>
                   )}
                 </div>
@@ -1299,13 +1310,13 @@ const DataManagement = () => {
               <div className="report-preview">
                 <h4>Report Details:</h4>
                 {reportType === 'students' && (
-                  <p>📋 Students Report - {students.length} records with PRN, Name, Year, Branch, Email and Contact information</p>
+                  <p><FaClipboardList /> Students Report - {students.length} records with PRN, Name, Year, Branch, Email and Contact information</p>
                 )}
                 {reportType === 'faculty' && (
-                  <p>📋 Faculty Report - {faculty.length} records with Faculty ID, Name, Department, Designation and Contact information</p>
+                  <p><FaClipboardList /> Faculty Report - {faculty.length} records with Faculty ID, Name, Department, Designation and Contact information</p>
                 )}
                 {reportType === 'dashboard' && (
-                  <p>📊 Dashboard Summary - Overview of total students, faculty, and year-wise distribution</p>
+                  <p><FaChartLine /> Dashboard Summary - Overview of total students, faculty, and year-wise distribution</p>
                 )}
               </div>
             </div>
@@ -1314,7 +1325,7 @@ const DataManagement = () => {
                 Cancel
               </button>
               <button onClick={handleGenerateReport} className="btn btn-success">
-                📥 Download Report
+                <FaFileDownload /> Download Report
               </button>
             </div>
           </div>
@@ -1354,7 +1365,7 @@ const DataManagement = () => {
               </div>
               <div className="form-group">
                 <p className="form-hint">
-                  💡 Recipients: {announcementTarget === 'all' ? 'All Users' : announcementTarget === 'student' ? 'All Students (' + students.length + ')' : 'All Faculty (' + faculty.length + ')'}
+                  <FaLightbulb /> Recipients: {announcementTarget === 'all' ? 'All Users' : announcementTarget === 'student' ? 'All Students (' + students.length + ')' : 'All Faculty (' + faculty.length + ')'}  
                 </p>
               </div>
             </div>
@@ -1363,7 +1374,7 @@ const DataManagement = () => {
                 Cancel
               </button>
               <button onClick={handleSendAnnouncement} className="btn btn-success">
-                📧 Send Announcement
+                <FaEnvelope /> Send Announcement
               </button>
             </div>
           </div>
@@ -1466,9 +1477,9 @@ const DatabaseManagement = () => {
       <div className="cards-grid">
         <div className="card">
           <div className="card-header">
-            <h2 className="card-title">🗃️ Database Tables</h2>
+            <h2 className="card-title"><FaDatabase /> Database Tables</h2>
             <button onClick={handleBackupDatabase} className="btn btn-success">
-              💾 Backup Database
+              <FaSave /> Backup Database
             </button>
           </div>
           <div className="tables-list">
@@ -1496,7 +1507,7 @@ const DatabaseManagement = () => {
 
         <div className="card">
           <div className="card-header">
-            <h2 className="card-title">⚡ SQL Query Interface</h2>
+            <h2 className="card-title"><FaBolt /> SQL Query Interface</h2>
           </div>
           <div className="sql-interface">
             <textarea
@@ -1508,10 +1519,10 @@ const DatabaseManagement = () => {
             />
             <div className="sql-actions">
               <button onClick={handleExecuteQuery} className="btn btn-primary">
-                🚀 Execute Query
+                <FaRocket /> Execute Query
               </button>
               <button onClick={() => setSqlQuery('')} className="btn btn-secondary">
-                🧹 Clear
+                <FaBroom /> Clear
               </button>
             </div>
             {queryResult && (
@@ -1526,7 +1537,7 @@ const DatabaseManagement = () => {
 
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">🔧 Schema Management</h2>
+          <h2 className="card-title"><FaTools /> Schema Management</h2>
         </div>
         <div className="schema-management">
           <div className="schema-info">
@@ -1596,7 +1607,7 @@ const ChangeRequestsManagement = () => {
       setRequests(filteredRequests);
     } catch (error) {
       console.error('Error fetching change requests:', error);
-      setActionStatus('❌ Error loading requests: ' + (error.response?.data?.message || error.message));
+      setActionStatus('[ERR] Error loading requests: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -1617,12 +1628,12 @@ const ChangeRequestsManagement = () => {
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
-      setActionStatus('✅ Change request approved successfully!');
+      setActionStatus('[OK] Change request approved successfully!');
       fetchChangeRequests();
       setTimeout(() => setActionStatus(''), 3000);
     } catch (error) {
       console.error('Approval error:', error);
-      setActionStatus('❌ Error: ' + (error.response?.data?.message || error.message));
+      setActionStatus('[ERR] Error: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -1640,12 +1651,12 @@ const ChangeRequestsManagement = () => {
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
-      setActionStatus('✅ Change request rejected.');
+      setActionStatus('[OK] Change request rejected.');
       fetchChangeRequests();
       setTimeout(() => setActionStatus(''), 3000);
     } catch (error) {
       console.error('Rejection error:', error);
-      setActionStatus('❌ Error: ' + (error.response?.data?.message || error.message));
+      setActionStatus('[ERR] Error: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -1657,7 +1668,7 @@ const ChangeRequestsManagement = () => {
       </div>
 
       {actionStatus && (
-        <div className={`alert ${actionStatus.includes('✅') ? 'alert-success' : actionStatus.includes('❌') ? 'alert-error' : 'alert-info'}`}>
+        <div className={`alert ${actionStatus.includes('[OK]') ? 'alert-success' : actionStatus.includes('[ERR]') ? 'alert-error' : 'alert-info'}`}>
           {actionStatus}
         </div>
       )}
@@ -1676,22 +1687,22 @@ const ChangeRequestsManagement = () => {
               onClick={() => setFilter('approved')}
               className={`btn ${filter === 'approved' ? 'btn-success' : 'btn-secondary'}`}
             >
-              ✅ Approved
+              <FaCheck /> Approved
             </button>
             <button 
               onClick={() => setFilter('rejected')}
               className={`btn ${filter === 'rejected' ? 'btn-warning' : 'btn-secondary'}`}
             >
-              ❌ Rejected
+              <FaTimes /> Rejected
             </button>
             <button 
               onClick={() => setFilter('all')}
               className={`btn ${filter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
             >
-              📋 All Requests
+              ▤ All Requests
             </button>
             <button onClick={fetchChangeRequests} className="btn btn-primary">
-              🔄 Refresh
+              ↻ Refresh
             </button>
           </div>
         </div>
@@ -1700,7 +1711,7 @@ const ChangeRequestsManagement = () => {
       {/* Requests Table */}
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">📋 Change Requests</h2>
+          <h2 className="card-title">▤ Change Requests</h2>
         </div>
         <div className="card-body">
           {loading ? (
@@ -1742,7 +1753,7 @@ const ChangeRequestsManagement = () => {
                       </td>
                       <td>
                         <span className={`prediction-badge ${request.changeType === 'password' ? 'good' : 'excellent'}`}>
-                          {request.changeType === 'password' ? '🔒 Password' : '👤 Profile'}
+                          {request.changeType === 'password' ? <><FaLock /> Password</> : <><FaUser /> Profile</>}
                         </span>
                       </td>
                       <td>{new Date(request.requestedAt).toLocaleString()}</td>
@@ -1784,14 +1795,14 @@ const ChangeRequestsManagement = () => {
                               className="btn btn-success"
                               style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
                             >
-                              ✅ Approve
+                              <FaCheckCircle /> Approve
                             </button>
                             <button 
                               onClick={() => handleReject(request.id)}
                               className="btn btn-warning"
                               style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
                             >
-                              ❌ Reject
+                              <FaTimesCircle /> Reject
                             </button>
                           </div>
                         ) : (
@@ -1928,7 +1939,7 @@ const MLModelControl = () => {
       <div className="cards-grid">
         <div className="card">
           <div className="card-header">
-            <h2 className="card-title">📊 Training Data</h2>
+            <h2 className="card-title">▥ Training Data</h2>
           </div>
           <div className="training-info">
             <div className="data-stats">
@@ -1950,7 +1961,7 @@ const MLModelControl = () => {
 
         <div className="card">
           <div className="card-header">
-            <h2 className="card-title">🤖 Model Status</h2>
+            <h2 className="card-title"><FaCog /> Model Status</h2>
           </div>
           <div className="model-status">
             <div className="status-indicator">
@@ -1974,13 +1985,13 @@ const MLModelControl = () => {
 
             <div className="model-actions">
               <button onClick={trainModel} className="btn btn-success" disabled={modelStatus === 'Training...'}>
-                🎯 Train Model
+                <FaBullseye /> Train Model
               </button>
               <button onClick={evaluateModel} className="btn btn-primary">
-                📊 Evaluate Model
+                ▥ Evaluate Model
               </button>
               <button onClick={exportModel} className="btn btn-warning">
-                💾 Export Model
+                ▦ Export Model
               </button>
             </div>
           </div>
@@ -1990,7 +2001,7 @@ const MLModelControl = () => {
       <div className="cards-grid">
         <div className="card">
           <div className="card-header">
-            <h2 className="card-title">📈 Model Performance</h2>
+            <h2 className="card-title">▴ Model Performance</h2>
           </div>
           <div className="metrics-grid">
             <div className="metric-card">
@@ -2014,7 +2025,7 @@ const MLModelControl = () => {
 
         <div className="card">
           <div className="card-header">
-            <h2 className="card-title">🔍 Feature Importance</h2>
+            <h2 className="card-title">⌕ Feature Importance</h2>
           </div>
           <div className="feature-importance">
             <div className="feature-bar">
@@ -2057,7 +2068,7 @@ const MLModelControl = () => {
       <div className="cards-grid">
         <div className="card">
           <div className="card-header">
-            <h2 className="card-title">🧠 ML Analysis (Admin)</h2>
+            <h2 className="card-title"><FaBrain /> ML Analysis (Admin)</h2>
             {analysisError && <div className="alert alert-error">{analysisError}</div>}
           </div>
           <div className="analysis-controls">
@@ -2120,7 +2131,7 @@ const MLModelControl = () => {
                 } finally {
                   setAnalysisLoading(false);
                 }
-              }}>📊 Run Class Analysis</button>
+              }}><FaChartBar /> Run Class Analysis</button>
               <button className="btn btn-warning" onClick={async () => {
                 try {
                   setAnalysisLoading(true);
@@ -2137,7 +2148,7 @@ const MLModelControl = () => {
                 } finally {
                   setAnalysisLoading(false);
                 }
-              }}>⚠️ Show At-Risk Students</button>
+              }}><FaExclamationTriangle /> Show At-Risk Students</button>
               <button className="btn btn-secondary" onClick={async () => {
                 try {
                   setAnalysisLoading(true);
@@ -2155,7 +2166,7 @@ const MLModelControl = () => {
                 } finally {
                   setAnalysisLoading(false);
                 }
-              }}>📚 Subject Analysis</button>
+              }}><FaBook /> Subject Analysis</button>
             </div>
           </div>
 
@@ -2286,9 +2297,9 @@ const UserManagement = () => {
   const renderAddUserForm = () => (
     <div className="card card-full-width">
       <div className="card-header">
-        <h2 className="card-title">➕ Add New User</h2>
+        <h2 className="card-title">+ Add New User</h2>
         <button onClick={fetchUsers} className="btn btn-primary btn-sm">
-          🔄 Refresh
+          <FaSyncAlt /> Refresh
         </button>
       </div>
       <form onSubmit={handleCreateUser} className="user-form">
@@ -2340,7 +2351,7 @@ const UserManagement = () => {
           </div>
         </div>
         <button type="submit" className="btn btn-success">
-          ➕ Create User
+          + Create User
         </button>
       </form>
     </div>
@@ -2362,6 +2373,7 @@ const UserManagement = () => {
             <thead>
               <tr>
                 <th>Username</th>
+                <th>Password</th>
                 <th>Reference ID</th>
                 <th>Last Login</th>
                 <th>Status</th>
@@ -2372,6 +2384,16 @@ const UserManagement = () => {
               {data.map((user) => (
                 <tr key={user._id}>
                   <td>{user.username}</td>
+                  <td style={{ 
+                    fontSize: '0.9rem',
+                    wordBreak: 'break-all',
+                    maxWidth: '200px',
+                    padding: '8px',
+                    fontFamily: 'monospace',
+                    color: '#333'
+                  }}>
+                    {user.plainPassword || user.referenceId}
+                  </td>
                   <td>{user.referenceId}</td>
                   <td>{user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}</td>
                   <td>
@@ -2385,7 +2407,7 @@ const UserManagement = () => {
                       className="btn-delete"
                       title="Delete user"
                     >
-                      🗑️
+                      <FaTrash />
                     </button>
                   </td>
                 </tr>
@@ -2400,9 +2422,9 @@ const UserManagement = () => {
   // Show detail view when a user type is selected
   if (selectedUserType) {
     const typeConfig = {
-      student: { title: 'Students', icon: '🎓', data: studentUsers },
-      faculty: { title: 'Faculty', icon: '👨‍🏫', data: facultyUsers },
-      admin: { title: 'Admins', icon: '⚙️', data: adminUsers }
+      student: { title: 'Students', icon: <FaGraduationCap />, data: studentUsers },
+      faculty: { title: 'Faculty', icon: <FaBolt />, data: facultyUsers },
+      admin: { title: 'Admins', icon: <FaCog />, data: adminUsers }
     };
 
     const config = typeConfig[selectedUserType];
@@ -2437,7 +2459,7 @@ const UserManagement = () => {
   return (
     <div>
       <div className="section-header">
-        <h1>👥 User Management</h1>
+        <h1>◉ User Management</h1>
         <p>Add new users and manage existing accounts</p>
       </div>
 
@@ -2450,7 +2472,7 @@ const UserManagement = () => {
           onClick={() => setSelectedUserType('student')}
           style={{ cursor: 'pointer' }}
         >
-          <div className="summary-icon">🎓</div>
+          <div className="summary-icon"><FaGraduationCap /></div>
           <h3>Students</h3>
           <p className="summary-count">{studentUsers.length}</p>
           <p className="summary-subtitle">Click to view</p>
@@ -2461,7 +2483,7 @@ const UserManagement = () => {
           onClick={() => setSelectedUserType('faculty')}
           style={{ cursor: 'pointer' }}
         >
-          <div className="summary-icon">👨‍🏫</div>
+          <div className="summary-icon"><FaBolt /></div>
           <h3>Faculty</h3>
           <p className="summary-count">{facultyUsers.length}</p>
           <p className="summary-subtitle">Click to view</p>
@@ -2472,7 +2494,7 @@ const UserManagement = () => {
           onClick={() => setSelectedUserType('admin')}
           style={{ cursor: 'pointer' }}
         >
-          <div className="summary-icon">⚙️</div>
+          <div className="summary-icon"><FaCog /></div>
           <h3>Admins</h3>
           <p className="summary-count">{adminUsers.length}</p>
           <p className="summary-subtitle">Click to view</p>
@@ -2510,12 +2532,12 @@ const AdminDashboard = () => {
   }, []);
 
   const navigation = [
-    { path: '/admin', label: '📊 Dashboard', component: DashboardOverview },
-    { path: '/admin/data', label: '📊 Data Display', component: DataDisplay },
-    { path: '/admin/manage', label: '💾 Data Management', component: DataManagement },
-    { path: '/admin/ml', label: '🤖 ML Model', component: MLModelControl },
-    { path: '/admin/users', label: '👥 User Management', component: UserManagement },
-    { path: '/admin/change-requests', label: '🔄 Change Requests', component: ChangeRequestsManagement },
+    { path: '/admin', label: 'Dashboard', icon: <FaTachometerAlt />, component: DashboardOverview },
+    { path: '/admin/data', label: 'Data Display', icon: <FaChartLine />, component: DataDisplay },
+    { path: '/admin/manage', label: 'Data Management', icon: <FaDatabase />, component: DataManagement },
+    { path: '/admin/ml', label: 'ML Model', icon: <FaRobot />, component: MLModelControl },
+    { path: '/admin/users', label: 'User Management', icon: <FaUsers />, component: UserManagement },
+    { path: '/admin/change-requests', label: 'Change Requests', icon: <FaSyncAlt />, component: ChangeRequestsManagement },
   ];
 
   return (
@@ -2529,11 +2551,11 @@ const AdminDashboard = () => {
             title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {sidebarCollapsed ? '☰' : '◀'}
+            {sidebarCollapsed ? <FaBars /> : <FaChevronLeft />}
           </button>
 
           <div className="sidebar-logo">
-            <div className="logo-icon">🎓</div>
+            <div className="logo-icon"><FaGraduationCap /></div>
             {!sidebarCollapsed && (
               <div className="logo-text">
                 <h2>Campus Connect</h2>
@@ -2551,8 +2573,8 @@ const AdminDashboard = () => {
               className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
               title={sidebarCollapsed ? item.label : ''}
             >
-              <span className="nav-icon">{item.label.split(' ')[0]}</span>
-              {!sidebarCollapsed && <span className="nav-label">{item.label.split(' ').slice(1).join(' ')}</span>}
+              <span className="nav-icon">{item.icon}</span>
+              {!sidebarCollapsed && <span className="nav-label">{item.label}</span>}
             </Link>
           ))}
         </nav>
@@ -2586,25 +2608,9 @@ const AdminDashboard = () => {
                 className="btn btn-primary"
                 style={{ position: 'relative' }}
               >
-                🔔 Notifications
+                <FaBell /> Notifications
                 {unreadCount > 0 && (
-                  <span 
-                    style={{
-                      position: 'absolute',
-                      top: '-8px',
-                      right: '-8px',
-                      background: '#e74c3c',
-                      color: 'white',
-                      borderRadius: '50%',
-                      width: '24px',
-                      height: '24px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.75rem',
-                      fontWeight: 'bold'
-                    }}
-                  >
+                  <span className="notif-count-badge">
                     {unreadCount}
                   </span>
                 )}
@@ -2613,7 +2619,7 @@ const AdminDashboard = () => {
                 onClick={() => navigate('/')}
                 className="btn btn-secondary"
               >
-                🏠 Home
+                <FaHome /> Home
               </button>
               <ProfileDropdown />
             </div>

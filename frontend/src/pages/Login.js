@@ -1,6 +1,7 @@
  import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { FaGraduationCap } from 'react-icons/fa';
 import './Login.css';
 
 const Login = () => {
@@ -32,7 +33,7 @@ const Login = () => {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          <h1>🎓 Campus Connect</h1>
+          <h1><FaGraduationCap /> Campus Connect</h1>
           <p>Sign in to your account</p>
         </div>
         

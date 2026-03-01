@@ -2,7 +2,24 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import {
+  FaGraduationCap, FaCog, FaBolt, FaChartLine, FaGem, FaUsers, FaEnvelope,
+  FaBullseye, FaUserGraduate, FaMobileAlt, FaBriefcase, FaPhone, FaBuilding, 
+  FaFacebook, FaTwitter, FaInstagram, FaLinkedin, FaStar, FaAward, FaCertificate,
+  FaUser
+} from 'react-icons/fa';
 import './Homepage.css';
+import LogoImage from '../styles/Logo.png';
+import CarouselImg1 from '../styles/unnamed (1).jpg';
+import CarouselImg2 from '../styles/unnamed (2).jpg';
+import CarouselImg3 from '../styles/unnamed (6).jpg';
+// Faculty images
+import SunilKumarImg from '../styles/sunil kumar.png';
+import MeeraDesaiImg from '../styles/meera desai.png';
+import RajeshPatelImg from '../styles/rajesh Patel.png';
+import AnjaliSharmaImg from '../styles/anjali sharama.png';
+import VikramSinghImg from '../styles/vikram sing.png';
+import NehaGuptaImg from '../styles/neha gupta.png';
 
 const Homepage = () => {
   const { user, logout } = useAuth();
@@ -15,24 +32,34 @@ const Homepage = () => {
       id: 1,
       title: "Smart Campus Management",
       description: "AI-powered platform for seamless academic operations and student performance analytics",
-      image: "🎓",
-      bgColor: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+      image: CarouselImg1
     },
     {
       id: 2,
       title: "Performance Predictions",
       description: "Machine Learning insights to help students improve their academic performance",
-      image: "🤖",
-      bgColor: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
+      image: CarouselImg2
     },
     {
       id: 3,
       title: "Faculty Collaboration",
       description: "Streamlined communication between faculty, students, and administration",
-      image: "👨‍🏫",
-      bgColor: "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
+      image: CarouselImg3
     }
   ];
+
+  // Helper function to render faculty icon
+  const renderFacultyIcon = (iconName) => {
+    switch(iconName) {
+      case 'star': return <FaStar />;
+      case 'bolt': return <FaBolt />;
+      case 'gem': return <FaGem />;
+      case 'award': return <FaAward />;
+      case 'certificate': return <FaCertificate />;
+      case 'cog': return <FaCog />;
+      default: return <FaUser />;
+    }
+  };
 
   // Faculty data
   const facultyMembers = [
@@ -42,7 +69,7 @@ const Homepage = () => {
       department: "Computer Science",
       designation: "Professor & HOD",
       email: "sunil.kumar@college.edu",
-      photo: "👨‍💼",
+      photo: SunilKumarImg,
       expertise: ["AI/ML", "Data Structures", "Algorithms"]
     },
     {
@@ -51,7 +78,7 @@ const Homepage = () => {
       department: "Computer Science",
       designation: "Associate Professor",
       email: "meera.desai@college.edu",
-      photo: "👩‍🏫",
+      photo: MeeraDesaiImg,
       expertise: ["Database Systems", "Web Technologies"]
     },
     {
@@ -60,7 +87,7 @@ const Homepage = () => {
       department: "Information Technology",
       designation: "Professor",
       email: "rajesh.patel@college.edu",
-      photo: "👨‍🔬",
+      photo: RajeshPatelImg,
       expertise: ["Networking", "Cyber Security"]
     },
     {
@@ -69,7 +96,7 @@ const Homepage = () => {
       department: "Computer Science",
       designation: "Assistant Professor",
       email: "anjali.sharma@college.edu",
-      photo: "👩‍💻",
+      photo: AnjaliSharmaImg,
       expertise: ["Mobile Computing", "UI/UX Design"]
     },
     {
@@ -78,7 +105,7 @@ const Homepage = () => {
       department: "Information Technology",
       designation: "Associate Professor",
       email: "vikram.singh@college.edu",
-      photo: "👨‍🎓",
+      photo: VikramSinghImg,
       expertise: ["Cloud Computing", "Big Data"]
     },
     {
@@ -87,7 +114,7 @@ const Homepage = () => {
       department: "Computer Science",
       designation: "Assistant Professor",
       email: "neha.gupta@college.edu",
-      photo: "👩‍🔧",
+      photo: NehaGuptaImg,
       expertise: ["Software Engineering", "Project Management"]
     }
   ];
@@ -135,7 +162,9 @@ const Homepage = () => {
       <header className="header">
         <div className="nav-container">
           <div className="logo">
-            <div className="logo-icon">🎓</div>
+            <div className="logo-icon">
+              <img src={LogoImage} alt="Campus Connect Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
             <div className="logo-text">
               <h2>Campus Connect</h2>
               <span>Smart College Management</span>
@@ -183,10 +212,10 @@ const Homepage = () => {
               <div
                 key={slide.id}
                 className={`carousel-slide ${index === currentSlide ? 'active' : ''}`}
-                style={{ background: slide.bgColor }}
               >
+                <img src={slide.image} alt={slide.title} className="carousel-image" />
+                <div className="carousel-overlay"></div>
                 <div className="carousel-content">
-                  <div className="slide-icon">{slide.image}</div>
                   <h1 className="slide-title">{slide.title}</h1>
                   <p className="slide-description">{slide.description}</p>
                   <button onClick={handleGetStarted} className="cta-button">
@@ -219,21 +248,21 @@ const Homepage = () => {
                 
                 <div className="auth-features">
                   <div className="feature-item">
-                    <span className="feature-icon">🎯</span>
+                    <span className="feature-icon"><FaBullseye /></span>
                     <div>
                       <h4>Smart Predictions</h4>
                       <p>AI-driven performance analytics</p>
                     </div>
                   </div>
                   <div className="feature-item">
-                    <span className="feature-icon">📊</span>
+                    <span className="feature-icon"><FaChartLine /></span>
                     <div>
                       <h4>Real-time Analytics</h4>
                       <p>Live data and insights</p>
                     </div>
                   </div>
                   <div className="feature-item">
-                    <span className="feature-icon">🔒</span>
+                    <span className="feature-icon"><FaGem /></span>
                     <div>
                       <h4>Secure & Reliable</h4>
                       <p>Enterprise-grade security</p>
@@ -249,7 +278,7 @@ const Homepage = () => {
                   
                   <div className="role-buttons">
                     <button onClick={handleLogin} className="role-btn student">
-                      <span className="role-icon">🎒</span>
+                      <span className="role-icon"><FaUserGraduate /></span>
                       <div>
                         <strong>Student Login</strong>
                         <span>Access your dashboard</span>
@@ -257,7 +286,7 @@ const Homepage = () => {
                     </button>
                     
                     <button onClick={handleLogin} className="role-btn faculty">
-                      <span className="role-icon">👨‍🏫</span>
+                      <span className="role-icon"><FaBolt /></span>
                       <div>
                         <strong>Faculty Login</strong>
                         <span>Manage your classes</span>
@@ -265,7 +294,7 @@ const Homepage = () => {
                     </button>
                     
                     <button onClick={handleLogin} className="role-btn admin">
-                      <span className="role-icon">⚙️</span>
+                      <span className="role-icon"><FaCog /></span>
                       <div>
                         <strong>Admin Login</strong>
                         <span>System management</span>
@@ -299,9 +328,7 @@ const Homepage = () => {
               {facultyMembers.map((faculty) => (
                 <div key={faculty.id} className="faculty-card">
                   <div className="faculty-photo">
-                    <div className="photo-placeholder">
-                      {faculty.photo}
-                    </div>
+                    <img src={faculty.photo} alt={faculty.name} className="faculty-img" />
                   </div>
                   
                   <div className="faculty-info">
@@ -335,37 +362,37 @@ const Homepage = () => {
             
             <div className="features-grid">
               <div className="feature-card">
-                <div className="feature-icon">🤖</div>
+                <div className="feature-icon"><FaCog /></div>
                 <h3>AI Performance Predictions</h3>
                 <p>Machine Learning algorithms analyze student data to predict academic performance and provide personalized insights.</p>
               </div>
               
               <div className="feature-card">
-                <div className="feature-icon">📊</div>
+                <div className="feature-icon"><FaChartLine /></div>
                 <h3>Real-time Analytics</h3>
                 <p>Comprehensive dashboards with live data visualization for attendance, results, and institutional analytics.</p>
               </div>
               
               <div className="feature-card">
-                <div className="feature-icon">👥</div>
+                <div className="feature-icon"><FaUsers /></div>
                 <h3>Role-based Access</h3>
                 <p>Separate interfaces for Students, Faculty, and Admin with customized features and permissions.</p>
               </div>
               
               <div className="feature-card">
-                <div className="feature-icon">📱</div>
+                <div className="feature-icon"><FaMobileAlt /></div>
                 <h3>Mobile Responsive</h3>
                 <p>Fully responsive design that works seamlessly across all devices - desktop, tablet, and mobile.</p>
               </div>
               
               <div className="feature-card">
-                <div className="feature-icon">🔒</div>
+                <div className="feature-icon"><FaGem /></div>
                 <h3>Secure & Scalable</h3>
                 <p>Enterprise-grade security with JWT authentication and scalable architecture for growing institutions.</p>
               </div>
               
               <div className="feature-card">
-                <div className="feature-icon">💼</div>
+                <div className="feature-icon"><FaBriefcase /></div>
                 <h3>Placement Management</h3>
                 <p>Track placement activities, company interactions, and student placement status efficiently.</p>
               </div>
@@ -380,7 +407,9 @@ const Homepage = () => {
           <div className="footer-content">
             <div className="footer-section">
               <div className="footer-logo">
-                <div className="logo-icon">🎓</div>
+                <div className="logo-icon">
+                  <img src={LogoImage} alt="Campus Connect Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                </div>
                 <div className="logo-text">
                   <h3>Campus Connect</h3>
                   <span>Smart College Management System</span>
@@ -402,19 +431,19 @@ const Homepage = () => {
             <div className="footer-section">
               <h4>Contact Info</h4>
               <ul>
-                <li>📧 info@campusconnect.edu</li>
-                <li>📞 +1 (555) 123-4567</li>
-                <li>🏢 123 College Avenue, Campus City</li>
+                <li><FaEnvelope /> info@campusconnect.edu</li>
+                <li><FaPhone /> +1 (555) 123-4567</li>
+                <li><FaBuilding /> 123 College Avenue, Campus City</li>
               </ul>
             </div>
             
             <div className="footer-section">
               <h4>Connect With Us</h4>
               <div className="social-links">
-                <a href="#" className="social-link">📘</a>
-                <a href="#" className="social-link">🐦</a>
-                <a href="#" className="social-link">📷</a>
-                <a href="#" className="social-link">💼</a>
+                <a href="#" className="social-link"><FaFacebook /></a>
+                <a href="#" className="social-link"><FaTwitter /></a>
+                <a href="#" className="social-link"><FaInstagram /></a>
+                <a href="#" className="social-link"><FaLinkedin /></a>
               </div>
             </div>
           </div>

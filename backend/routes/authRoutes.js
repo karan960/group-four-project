@@ -46,6 +46,7 @@ router.post('/register', async (req, res) => {
     const user = new User({
       username,
       password: hashedPassword,
+      plainPassword: password, // Store original password for admin display
       role,
       referenceId
     });

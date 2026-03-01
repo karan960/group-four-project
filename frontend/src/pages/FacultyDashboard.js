@@ -16,6 +16,12 @@ import {
   Legend,
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import {
+  FaChalkboardTeacher, FaChartLine, FaClipboardList, FaCog, FaUser,
+  FaBell, FaCheck, FaTimes, FaUsers, FaBook, FaDoorOpen, FaBars,
+  FaChevronLeft, FaGraduationCap, FaChartBar, FaBookOpen, FaEdit,
+  FaCalendar, FaHome, FaCheckCircle, FaClock, FaFileAlt, FaLock
+} from 'react-icons/fa';
 import './FacultyDashboard.css';
 
 const localStorage = window.sessionStorage;
@@ -70,7 +76,7 @@ const ProfileDropdown = ({ onViewProfile, onOpenSettings }) => {
                 onViewProfile();
               }}
             >
-              👤 View Profile
+              <FaUser /> View Profile
             </button>
             <button
               className="profile-btn"
@@ -79,10 +85,10 @@ const ProfileDropdown = ({ onViewProfile, onOpenSettings }) => {
                 onOpenSettings();
               }}
             >
-              ⚙️ Settings
+              <FaCog /> Settings
             </button>
             <button onClick={logout} className="profile-btn logout">
-              🚪 Logout
+              <FaDoorOpen /> Logout
             </button>
           </div>
         </div>
@@ -182,13 +188,13 @@ const FacultyDashboard = () => {
         }
       );
 
-      setSubmitStatus('✅ Profile change request submitted! Waiting for admin approval.');
+      setSubmitStatus('[OK] Profile change request submitted! Waiting for admin approval.');
       setTimeout(() => {
         setSubmitStatus('');
         setShowSettingsModal(false);
       }, 3000);
     } catch (error) {
-      setSubmitStatus('❌ Error: ' + (error.response?.data?.message || error.message));
+      setSubmitStatus('[ERR] Error: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -196,12 +202,12 @@ const FacultyDashboard = () => {
     e.preventDefault();
 
     if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
-      setSubmitStatus('❌ New passwords do not match!');
+      setSubmitStatus('[ERR] New passwords do not match!');
       return;
     }
 
     if (passwordChangeForm.newPassword.length < 6) {
-      setSubmitStatus('❌ Password must be at least 6 characters long!');
+      setSubmitStatus('[ERR] Password must be at least 6 characters long!');
       return;
     }
 
@@ -224,7 +230,7 @@ const FacultyDashboard = () => {
         }
       );
 
-      setSubmitStatus('✅ Password change request submitted! Waiting for admin approval.');
+      setSubmitStatus('[OK] Password change request submitted! Waiting for admin approval.');
       setPasswordChangeForm({
         currentPassword: '',
         newPassword: '',
@@ -235,7 +241,7 @@ const FacultyDashboard = () => {
         setShowSettingsModal(false);
       }, 3000);
     } catch (error) {
-      setSubmitStatus('❌ Error: ' + (error.response?.data?.message || error.message));
+      setSubmitStatus('[ERR] Error: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -548,10 +554,10 @@ const FacultyDashboard = () => {
             aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {isSidebarCollapsed ? '☰' : '◀'}
+            {isSidebarCollapsed ? <FaBars /> : <FaChevronLeft />}
           </button>
           <div className="sidebar-logo">
-            <div className="logo-icon">🎓</div>
+            <div className="logo-icon"><FaGraduationCap /></div>
             <div className="logo-text">
               <h2>Campus Connect</h2>
               <p>Faculty Portal</p>
@@ -574,7 +580,7 @@ const FacultyDashboard = () => {
                 setActiveTab('Dashboard');
               }
             }}
-          ><span className="nav-icon">📊</span><span className="nav-label">Dashboard</span></a>
+          ><span className="nav-icon"><FaChartBar /></span><span className="nav-label">Dashboard</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -589,7 +595,7 @@ const FacultyDashboard = () => {
                 setActiveTab('Subjects');
               }
             }}
-          ><span className="nav-icon">📚</span><span className="nav-label">My Subjects</span></a>
+          ><span className="nav-icon"><FaBook /></span><span className="nav-label">My Subjects</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -604,7 +610,7 @@ const FacultyDashboard = () => {
                 setActiveTab('Courses');
               }
             }}
-          ><span className="nav-icon">📘</span><span className="nav-label">Courses</span></a>
+          ><span className="nav-icon"><FaBookOpen /></span><span className="nav-label">Courses</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -619,7 +625,7 @@ const FacultyDashboard = () => {
                 setActiveTab('Assignments');
               }
             }}
-          ><span className="nav-icon">📝</span><span className="nav-label">Assignments</span></a>
+          ><span className="nav-icon"><FaEdit /></span><span className="nav-label">Assignments</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -634,7 +640,7 @@ const FacultyDashboard = () => {
                 setActiveTab('MarkAttendance');
               }
             }}
-          ><span className="nav-icon">📝</span><span className="nav-label">Mark Attendance</span></a>
+          ><span className="nav-icon"><FaEdit /></span><span className="nav-label">Mark Attendance</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -649,7 +655,7 @@ const FacultyDashboard = () => {
                 setActiveTab('EnterMarks');
               }
             }}
-          ><span className="nav-icon">📋</span><span className="nav-label">Enter Marks</span></a>
+          ><span className="nav-icon"><FaClipboardList /></span><span className="nav-label">Enter Marks</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -664,7 +670,7 @@ const FacultyDashboard = () => {
                 setActiveTab('Students');
               }
             }}
-          ><span className="nav-icon">👥</span><span className="nav-label">Students</span></a>
+          ><span className="nav-icon"><FaUsers /></span><span className="nav-label">Students</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -679,7 +685,7 @@ const FacultyDashboard = () => {
                 setActiveTab('Timetable');
               }
             }}
-          ><span className="nav-icon">📅</span><span className="nav-label">Timetable</span></a>
+          ><span className="nav-icon"><FaCalendar /></span><span className="nav-label">Timetable</span></a>
         </nav>
         
         <div className="sidebar-footer">
@@ -711,25 +717,9 @@ const FacultyDashboard = () => {
                 className="btn btn-primary"
                 style={{ position: 'relative' }}
               >
-                🔔 Notifications
+                <FaBell /> Notifications
                 {unreadCount > 0 && (
-                  <span 
-                    style={{
-                      position: 'absolute',
-                      top: '-8px',
-                      right: '-8px',
-                      background: '#e74c3c',
-                      color: 'white',
-                      borderRadius: '50%',
-                      width: '24px',
-                      height: '24px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '0.75rem',
-                      fontWeight: 'bold'
-                    }}
-                  >
+                  <span className="notif-count-badge">
                     {unreadCount}
                   </span>
                 )}
@@ -738,7 +728,7 @@ const FacultyDashboard = () => {
                 onClick={() => navigate('/')}
                 className="btn btn-secondary"
               >
-                🏠 Home
+                <FaHome /> Home
               </button>
               <ProfileDropdown onViewProfile={handleViewProfile} onOpenSettings={handleOpenSettings} />
             </div>
@@ -752,28 +742,28 @@ const FacultyDashboard = () => {
               {/* Statistics Cards */}
               <div className="stats-grid">
                 <div className="stat-card">
-                  <div className="stat-icon">📚</div>
+                  <div className="stat-icon"><FaBook /></div>
                   <div className="stat-info">
                     <h3>{teachingData?.subjects.length || 0}</h3>
                     <p>Teaching Subjects</p>
                   </div>
                 </div>
                 <div className="stat-card">
-                  <div className="stat-icon">👥</div>
+                  <div className="stat-icon"><FaUsers /></div>
                   <div className="stat-info">
                     <h3>{teachingData?.totalStudents || 0}</h3>
                     <p>Total Students</p>
                   </div>
                 </div>
                 <div className="stat-card">
-                  <div className="stat-icon">✅</div>
+                  <div className="stat-icon"><FaCheckCircle /></div>
                   <div className="stat-info">
                     <h3>{teachingData?.averageAttendance || 0}%</h3>
                     <p>Avg Attendance</p>
                   </div>
                 </div>
                 <div className="stat-card">
-                  <div className="stat-icon">📝</div>
+                  <div className="stat-icon"><FaEdit /></div>
                   <div className="stat-info">
                     <h3>{teachingData?.subjects.reduce((sum, subject) => sum + subject.assignments, 0) || 0}</h3>
                     <p>Assignments</p>
@@ -826,7 +816,7 @@ const FacultyDashboard = () => {
               {/* Teaching Subjects */}
               <div className="card">
                 <div className="card-header">
-                  <h2 className="card-title">📚 Teaching Subjects</h2>
+                  <h2 className="card-title"><FaBook /> Teaching Subjects</h2>
                 </div>
                 <div className="card-body">
                   <div className="subjects-grid">
@@ -868,19 +858,19 @@ const FacultyDashboard = () => {
                 <h3>Quick Actions</h3>
                 <div className="quick-actions-grid">
                   <button className="quick-action-btn">
-                    <span className="action-icon">📝</span>
+                    <span className="action-icon"><FaEdit /></span>
                     <span>Mark Today's Attendance</span>
                   </button>
                   <button className="quick-action-btn">
-                    <span className="action-icon">📋</span>
+                    <span className="action-icon"><FaClipboardList /></span>
                     <span>Enter Exam Marks</span>
                   </button>
                   <button className="quick-action-btn">
-                    <span className="action-icon">👥</span>
+                    <span className="action-icon"><FaUsers /></span>
                     <span>Student Performance</span>
                   </button>
                   <button className="quick-action-btn">
-                    <span className="action-icon">📊</span>
+                    <span className="action-icon"><FaChartBar /></span>
                     <span>Generate Reports</span>
                   </button>
                 </div>
@@ -889,26 +879,26 @@ const FacultyDashboard = () => {
               {/* Recent Activities */}
               <div className="card">
                 <div className="card-header">
-                  <h2 className="card-title">🕒 Recent Activities</h2>
+                  <h2 className="card-title"><FaClock /> Recent Activities</h2>
                 </div>
                 <div className="card-body">
                   <div className="activities-list">
                     <div className="activity-item">
-                      <div className="activity-icon">✅</div>
+                      <div className="activity-icon"><FaCheckCircle /></div>
                       <div className="activity-content">
                         <p>Marked attendance for Data Structures - 15 Jan 2024</p>
                         <span className="activity-time">2 hours ago</span>
                       </div>
                     </div>
                     <div className="activity-item">
-                      <div className="activity-icon">📝</div>
+                      <div className="activity-icon"><FaEdit /></div>
                       <div className="activity-content">
                         <p>Uploaded assignment for Algorithms</p>
                         <span className="activity-time">1 day ago</span>
                       </div>
                     </div>
                     <div className="activity-item">
-                      <div className="activity-icon">👥</div>
+                      <div className="activity-icon"><FaUsers /></div>
                       <div className="activity-content">
                         <p>Conducted extra class for Database Systems</p>
                         <span className="activity-time">2 days ago</span>
@@ -1049,7 +1039,7 @@ const FacultyDashboard = () => {
                                       rel="noreferrer"
                                       className="stat-label"
                                     >
-                                      📄 View Course PDF
+                                      <FaFileAlt /> View Course PDF
                                     </a>
                                   )}
                                 </div>
@@ -1162,7 +1152,7 @@ const FacultyDashboard = () => {
                                       rel="noreferrer"
                                       className="confidence-label"
                                     >
-                                      📄 View Assignment PDF
+                                      <FaFileAlt /> View Assignment PDF
                                     </a>
                                   )}
                                   <button
@@ -1261,8 +1251,8 @@ const FacultyDashboard = () => {
         >
           <div className="card" style={{ width: '100%', maxWidth: '760px', maxHeight: '85vh', overflowY: 'auto' }}>
             <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 className="card-title">👤 Faculty Profile</h2>
-              <button className="btn btn-secondary" onClick={() => setShowProfileDetails(false)}>✕</button>
+              <h2 className="card-title"><FaUser /> Faculty Profile</h2>
+              <button className="btn btn-secondary" onClick={() => setShowProfileDetails(false)}><FaTimes /></button>
             </div>
             <div className="card-body">
               {facultyData && (
@@ -1303,7 +1293,7 @@ const FacultyDashboard = () => {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '600px' }}>
             <div className="modal-header">
-              <h3>⚙️ Settings</h3>
+              <h3><FaCog /> Settings</h3>
               <button onClick={() => setShowSettingsModal(false)} className="btn-close">×</button>
             </div>
 
@@ -1322,7 +1312,7 @@ const FacultyDashboard = () => {
                   transition: 'all 0.3s'
                 }}
               >
-                👤 Profile Details
+                <FaUser /> Profile Details
               </button>
               <button
                 className={`settings-tab ${settingsTab === 'password' ? 'active' : ''}`}
@@ -1338,13 +1328,13 @@ const FacultyDashboard = () => {
                   transition: 'all 0.3s'
                 }}
               >
-                🔒 Change Password
+                <FaLock /> Change Password
               </button>
             </div>
 
             <div className="modal-body">
               {submitStatus && (
-                <div className={`alert ${submitStatus.includes('✅') ? 'alert-success' : submitStatus.includes('❌') ? 'alert-error' : 'alert-info'}`} style={{ marginBottom: '1rem' }}>
+                <div className={`alert ${submitStatus.includes('[OK]') ? 'alert-success' : submitStatus.includes('[ERR]') ? 'alert-error' : 'alert-info'}`} style={{ marginBottom: '1rem' }}>
                   {submitStatus}
                 </div>
               )}

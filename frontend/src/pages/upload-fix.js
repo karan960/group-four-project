@@ -20,7 +20,7 @@ const handleBulkUpload = async () => {
     });
 
     const { results } = response.data;
-    setUploadStatus(`✅ Upload successful! ${results.successful} records processed, ${results.failed} failed`);
+    setUploadStatus(`[OK] Upload successful! ${results.successful} records processed, ${results.failed} failed`);
     
     if (results.failed > 0) {
       setUploadStatus(prev => prev + '. Check console for details.');
@@ -30,6 +30,6 @@ const handleBulkUpload = async () => {
     setExcelFile(null);
     fetchData(); // Refresh data
   } catch (error) {
-    setUploadStatus('❌ Upload failed: ' + (error.response?.data?.message || error.message));
+    setUploadStatus('[ERR] Upload failed: ' + (error.response?.data?.message || error.message));
   }
 };

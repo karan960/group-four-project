@@ -369,6 +369,7 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
             await User.create({
               username: studentData.prn,
               password: defaultPassword,
+              plainPassword: studentData.prn, // Store original password for admin display
               role: 'student',
               referenceId: studentData.prn
             });
@@ -413,6 +414,7 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
             await User.create({
               username: facultyData.facultyId,
               password: defaultPassword,
+              plainPassword: facultyData.facultyId, // Store original password for admin display
               role: 'faculty',
               referenceId: facultyData.facultyId
             });
@@ -614,7 +616,7 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
 // ==================== LEGACY ENDPOINTS (for backward compatibility) ====================
 app.get('/api/users', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const users = await User.find().select('-password').sort({ username: 1 });
+    const users = await User.find().sort({ username: 1 });
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

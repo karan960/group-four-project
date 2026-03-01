@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
+import { FaChartLine, FaSyncAlt, FaFileDownload } from 'react-icons/fa';
 import './AdminDashboard.css';
 
 const localStorage = window.sessionStorage;
@@ -333,9 +334,9 @@ const DatabaseManagement = () => {
   const filteredData = getFilteredData();
 
   return (
-    <div className="admin-section">
-      <div className="section-header">
-        <h2>📊 Database Management - Data Display</h2>
+    <div className="admin-section db-management-page">
+      <div className="section-header dashboard-section-header">
+        <h2><FaChartLine /> Database Management - Data Display</h2>
         <p>View and manage all system data</p>
       </div>
 
@@ -351,10 +352,10 @@ const DatabaseManagement = () => {
             }}
             className="form-control"
           >
-            <option value="students">🎓 Students Data</option>
-            <option value="faculty">👨‍🏫 Faculty Data</option>
-            <option value="marks">📈 Marks Data</option>
-            <option value="attendance">✅ Attendance Data</option>
+            <option value="students">Students Data</option>
+            <option value="faculty">Faculty Data</option>
+            <option value="marks">Marks Data</option>
+            <option value="attendance">Attendance Data</option>
           </select>
 
           <input
@@ -366,11 +367,11 @@ const DatabaseManagement = () => {
           />
 
           <button onClick={exportToCSV} className="btn btn-info">
-            📥 Export to CSV
+            <FaFileDownload /> Export to CSV
           </button>
 
           <button onClick={fetchAllData} className="btn btn-secondary">
-            🔄 Refresh
+            <FaSyncAlt /> Refresh
           </button>
         </div>
       </div>
