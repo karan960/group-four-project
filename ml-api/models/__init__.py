@@ -2,6 +2,9 @@
 ML Models Package
 """
 
-from .performance_model import StudentPerformanceModel
+from .performance_model import StudentPerformanceAnalyzer
 
-__all__ = ['StudentPerformanceModel']
+# Backward compatibility alias for older imports.
+StudentPerformanceModel = StudentPerformanceAnalyzer
+
+__all__ = ['StudentPerformanceAnalyzer', 'StudentPerformanceModel']

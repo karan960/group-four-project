@@ -118,23 +118,69 @@ router.post('/', async (req, res) => {
 
     // Check if student already exists
     const existingStudent = await Student.findOne({ prn: studentData.prn });
-    if (existingStudent) {
+    if (existingStudent && existingStudent.isActive !== false) {
       return res.status(400).json({ message: 'Student with this PRN already exists' });
+    }
+
+    if (existingStudent && existingStudent.isActive === false) {
+      // Reactivate previously soft-deleted student and refresh profile data.
+      Object.assign(existingStudent, studentData, {
+        isActive: true,
+        lastUpdated: Date.now()
+      });
+      await existingStudent.save();
+
+      const defaultPassword = await bcrypt.hash(studentData.prn, 10);
+      const existingUser = await User.findOne({ username: studentData.prn });
+      if (existingUser) {
+        existingUser.password = defaultPassword;
+        existingUser.role = 'student';
+        existingUser.referenceId = studentData.prn;
+        existingUser.isActive = true;
+        await existingUser.save();
+      } else {
+        await User.create({
+          username: studentData.prn,
+          password: defaultPassword,
+          role: 'student',
+          referenceId: studentData.prn,
+          isActive: true
+        });
+      }
+
+      return res.status(201).json({
+        message: 'Student reactivated successfully',
+        student: existingStudent,
+        credentials: {
+          username: studentData.prn,
+          defaultPassword: studentData.prn,
+          note: 'Student should change password on first login'
+        }
+      });
     }
 
     // Create student
     const student = new Student(studentData);
     await student.save();
 
-    // Auto-create user account with PRN as username
+    // Auto-create or reactivate user account with PRN as username
     const defaultPassword = await bcrypt.hash(studentData.prn, 10);
-    const user = new User({
-      username: studentData.prn,
-      password: defaultPassword,
-      role: 'student',
-      referenceId: studentData.prn
-    });
-    await user.save();
+    const existingUser = await User.findOne({ username: studentData.prn });
+    if (existingUser) {
+      existingUser.password = defaultPassword;
+      existingUser.role = 'student';
+      existingUser.referenceId = studentData.prn;
+      existingUser.isActive = true;
+      await existingUser.save();
+    } else {
+      const user = new User({
+        username: studentData.prn,
+        password: defaultPassword,
+        role: 'student',
+        referenceId: studentData.prn
+      });
+      await user.save();
+    }
 
     res.status(201).json({ 
       message: 'Student created successfully',
@@ -169,26 +215,21 @@ router.put('/:prn', async (req, res) => {
   }
 });
 
-// DELETE student (soft delete)
+// DELETE student (hard delete with linked user cleanup)
 router.delete('/:prn', async (req, res) => {
   try {
-    const student = await Student.findOneAndUpdate(
-      { prn: req.params.prn },
-      { isActive: false, lastUpdated: Date.now() },
-      { new: true }
-    );
+    const student = await Student.findOneAndDelete({ prn: req.params.prn });
 
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    // Also deactivate user account
-    await User.findOneAndUpdate(
+    // Also remove linked user account from user management.
+    await User.findOneAndDelete(
       { username: req.params.prn },
-      { isActive: false }
     );
 
-    res.json({ message: 'Student deactivated successfully' });
+    res.json({ message: 'Student and linked user deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -199,7 +240,7 @@ router.delete('/:prn', async (req, res) => {
 // POST add semester marks
 router.post('/:prn/marks', async (req, res) => {
   try {
-    const { semester, subjects } = req.body;
+    const { semester, year, academicYear, subjects } = req.body;
     
     const student = await Student.findOne({ prn: req.params.prn });
     if (!student) {
@@ -224,7 +265,9 @@ router.post('/:prn/marks', async (req, res) => {
 
     // Add semester marks
     const semesterData = {
+      year: year || student.year || 'First',
       semester,
+      academicYear: academicYear || '',
       subjects,
       sgpa: parseFloat(sgpa),
       totalCredits,

@@ -6,6 +6,22 @@ const Faculty = require('../models/Faculty');
 
 const ML_API_URL = process.env.ML_API_URL || 'http://localhost:5001/api/ml/performance';
 
+const buildStudentQuery = ({ year, branch, division }) => {
+  const query = { isActive: true };
+  if (year) query.year = year;
+  if (branch) query.branch = branch;
+  if (division) query.division = division;
+  return query;
+};
+
+const ensureAdmin = (req, res) => {
+  if (!req.user || req.user.role !== 'admin') {
+    res.status(403).json({ error: 'Admin access required' });
+    return false;
+  }
+  return true;
+};
+
 // ==================== HELPER FUNCTION ====================
 
 /**
@@ -136,14 +152,9 @@ router.get('/student/:studentId/improvement', async (req, res) => {
 router.post('/class-statistics', async (req, res) => {
   try {
     const { year, branch, division } = req.body;
-    
-    // Fetch all students in the class
-    const students = await Student.find({ 
-      year, 
-      branch, 
-      division,
-      isActive: true 
-    });
+
+    // Fetch students with optional filters
+    const students = await Student.find(buildStudentQuery({ year, branch, division }));
     
     if (students.length === 0) {
       return res.status(404).json({ error: 'No students found for this class' });
@@ -178,14 +189,9 @@ router.post('/class-statistics', async (req, res) => {
 router.post('/at-risk-students', async (req, res) => {
   try {
     const { year, branch, division } = req.body;
-    
-    // Fetch all students in the class
-    const students = await Student.find({ 
-      year, 
-      branch, 
-      division,
-      isActive: true 
-    });
+
+    // Fetch students with optional filters
+    const students = await Student.find(buildStudentQuery({ year, branch, division }));
     
     if (students.length === 0) {
       return res.status(404).json({ error: 'No students found for this class' });
@@ -261,14 +267,9 @@ router.post('/compare-students', async (req, res) => {
 router.post('/subject-analysis', async (req, res) => {
   try {
     const { subject_name, year, branch, division } = req.body;
-    
-    // Fetch all students in the class
-    const students = await Student.find({ 
-      year, 
-      branch, 
-      division,
-      isActive: true 
-    });
+
+    // Fetch students with optional filters
+    const students = await Student.find(buildStudentQuery({ year, branch, division }));
     
     if (students.length === 0) {
       return res.status(404).json({ error: 'No students found for this class' });
@@ -390,6 +391,351 @@ router.get('/institution-stats', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to fetch institution statistics',
       details: error.message 
+    });
+  }
+});
+
+/**
+ * GET current ML model metadata
+ * GET /api/ml-analysis/model-info
+ */
+router.get('/model-info', async (req, res) => {
+  try {
+    const response = await axios.get(`${ML_API_URL}/model-info`);
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error fetching model info:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch model info',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST train model from database students
+ * POST /api/ml-analysis/train-model
+ */
+router.post('/train-model', async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return;
+
+    const { year, branch, division } = req.body || {};
+    const students = await Student.find(buildStudentQuery({ year, branch, division }));
+
+    if (!students.length) {
+      return res.status(404).json({ error: 'No students found for training' });
+    }
+
+    const studentsData = students.map(formatStudentData);
+    const response = await axios.post(`${ML_API_URL}/train-db`, { students: studentsData });
+
+    res.json({
+      ...response.data,
+      trainingScope: {
+        totalStudents: students.length,
+        year: year || 'All',
+        branch: branch || 'All',
+        division: division || 'All'
+      }
+    });
+  } catch (error) {
+    console.error('Error training model:', error.message);
+    res.status(500).json({
+      error: 'Failed to train model',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST save model artifact (admin only)
+ * POST /api/ml-analysis/save-model
+ */
+router.post('/save-model', async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return;
+
+    const { path: modelPath = 'models/performance_model.joblib' } = req.body || {};
+    const response = await axios.post(`${ML_API_URL}/save-model`, { path: modelPath });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error saving model:', error.message);
+    res.status(500).json({
+      error: 'Failed to save model',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST load model artifact (admin only)
+ * POST /api/ml-analysis/load-model
+ */
+router.post('/load-model', async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return;
+
+    const { path: modelPath = 'models/performance_model.joblib' } = req.body || {};
+    const response = await axios.post(`${ML_API_URL}/load-model`, { path: modelPath });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error loading model:', error.message);
+    res.status(500).json({
+      error: 'Failed to load model',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET student ML analysis by PRN (for student dashboard)
+ * GET /api/ml-analysis/student-prn/:prn
+ */
+router.get('/student-prn/:prn', async (req, res) => {
+  try {
+    const { prn } = req.params;
+    const student = await Student.findOne({ prn, isActive: true });
+
+    if (!student) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    const studentData = formatStudentData(student);
+
+    const [individual, subjects, improvement] = await Promise.all([
+      axios.post(`${ML_API_URL}/individual/${student._id}`, studentData),
+      axios.post(`${ML_API_URL}/subject-wise/${student._id}`, studentData),
+      axios.post(`${ML_API_URL}/improvement-analysis/${student._id}`, studentData).catch(() => ({ data: null }))
+    ]);
+
+    res.json({
+      success: true,
+      student: {
+        _id: student._id,
+        prn: student.prn,
+        studentName: student.studentName
+      },
+      individual: individual.data,
+      subjects: subjects.data,
+      improvement: improvement?.data || null
+    });
+  } catch (error) {
+    console.error('Error fetching student PRN analysis:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch student analysis',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET faculty subject analysis based on assigned subjects and department
+ * GET /api/ml-analysis/faculty/:facultyId/subject-analysis
+ */
+router.get('/faculty/:facultyId/subject-analysis', async (req, res) => {
+  try {
+    const { facultyId } = req.params;
+    let faculty = null;
+    if (facultyId.match(/^[0-9a-fA-F]{24}$/)) {
+      faculty = await Faculty.findById(facultyId);
+    }
+    if (!faculty) {
+      faculty = await Faculty.findOne({ facultyId: facultyId.toUpperCase() });
+    }
+
+    if (!faculty) {
+      return res.status(404).json({ error: 'Faculty not found' });
+    }
+
+    const query = { isActive: true };
+    if (faculty.department) {
+      query.$or = [{ branch: faculty.department }, { department: faculty.department }];
+    }
+
+    const students = await Student.find(query);
+
+    if (!students.length) {
+      return res.status(404).json({ error: 'No students found for this faculty scope' });
+    }
+
+    const studentsData = students.map(formatStudentData);
+    const subjects = faculty.assignedSubjects || [];
+
+    const subjectResults = [];
+    for (const subject of subjects) {
+      const subjectName = subject.subjectName || 'All Subjects';
+      const response = await axios.post(`${ML_API_URL}/subject-analysis`, {
+        subject_name: subjectName,
+        students: studentsData
+      });
+      subjectResults.push({
+        subject: subjectName,
+        stats: response.data?.statistics || {}
+      });
+    }
+
+    if (!subjectResults.length) {
+      const fallback = await axios.post(`${ML_API_URL}/subject-analysis`, {
+        subject_name: 'All Subjects',
+        students: studentsData
+      });
+      subjectResults.push({
+        subject: 'All Subjects',
+        stats: fallback.data?.statistics || {}
+      });
+    }
+
+    res.json({
+      success: true,
+      faculty: {
+        _id: faculty._id,
+        facultyName: faculty.facultyName,
+        department: faculty.department
+      },
+      subjects: subjectResults
+    });
+  } catch (error) {
+    console.error('Error fetching faculty subject analysis:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch faculty subject analysis',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET faculty-wide student analysis summary list
+ * GET /api/ml-analysis/faculty/:facultyId/students-analysis
+ */
+router.get('/faculty/:facultyId/students-analysis', async (req, res) => {
+  try {
+    const { facultyId } = req.params;
+    const { year, division } = req.query;
+    let faculty = null;
+    if (facultyId.match(/^[0-9a-fA-F]{24}$/)) {
+      faculty = await Faculty.findById(facultyId);
+    }
+    if (!faculty) {
+      faculty = await Faculty.findOne({ facultyId: facultyId.toUpperCase() });
+    }
+
+    if (!faculty) {
+      return res.status(404).json({ error: 'Faculty not found' });
+    }
+
+    const scopedQuery = { isActive: true };
+    if (faculty.department) {
+      scopedQuery.$or = [{ branch: faculty.department }, { department: faculty.department }];
+    }
+    if (year) scopedQuery.year = year;
+    if (division) scopedQuery.division = division;
+
+    let students = await Student.find(scopedQuery).sort({ studentName: 1 });
+
+    // If faculty department mapping doesn't match stored student branch values,
+    // fall back to all active students so the Students tab is always populated.
+    if (!students.length) {
+      const fallbackQuery = { isActive: true };
+      if (year) fallbackQuery.year = year;
+      if (division) fallbackQuery.division = division;
+      students = await Student.find(fallbackQuery).sort({ studentName: 1 });
+    }
+
+    if (!students.length) {
+      return res.status(404).json({ error: 'No students found for this faculty scope' });
+    }
+
+    const analyzedStudents = await Promise.all(
+      students.map(async (student) => {
+        const studentData = formatStudentData(student);
+        try {
+          const response = await axios.post(`${ML_API_URL}/individual/${student._id}`, studentData);
+          const perf = response.data?.performance || {};
+          return {
+            _id: student._id,
+            prn: student.prn,
+            studentName: student.studentName,
+            year: student.year,
+            division: student.division,
+            cgpa: student.cgpa || 0,
+            overallAttendance: student.overallAttendance || 0,
+            status: perf.performance_category || 'Average',
+            riskLevel: perf.risk_level || 'Medium Risk'
+          };
+        } catch (error) {
+          return {
+            _id: student._id,
+            prn: student.prn,
+            studentName: student.studentName,
+            year: student.year,
+            division: student.division,
+            cgpa: student.cgpa || 0,
+            overallAttendance: student.overallAttendance || 0,
+            status: 'Analysis Pending',
+            riskLevel: 'Unknown'
+          };
+        }
+      })
+    );
+
+    res.json({
+      success: true,
+      faculty: {
+        _id: faculty._id,
+        facultyName: faculty.facultyName,
+        department: faculty.department
+      },
+      totalStudents: analyzedStudents.length,
+      students: analyzedStudents
+    });
+  } catch (error) {
+    console.error('Error fetching faculty students analysis list:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch faculty students analysis',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET complete analysis payload for a student
+ * GET /api/ml-analysis/student/:studentId/full-analysis
+ */
+router.get('/student/:studentId/full-analysis', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const student = await Student.findById(studentId);
+
+    if (!student) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    const studentData = formatStudentData(student);
+    const [individual, subjects, improvement] = await Promise.all([
+      axios.post(`${ML_API_URL}/individual/${studentId}`, studentData),
+      axios.post(`${ML_API_URL}/subject-wise/${studentId}`, studentData),
+      axios.post(`${ML_API_URL}/improvement-analysis/${studentId}`, studentData).catch(() => ({ data: null }))
+    ]);
+
+    res.json({
+      success: true,
+      student: {
+        _id: student._id,
+        prn: student.prn,
+        studentName: student.studentName,
+        year: student.year,
+        division: student.division
+      },
+      individual: individual.data,
+      subjects: subjects.data,
+      improvement: improvement?.data || null
+    });
+  } catch (error) {
+    console.error('Error fetching full student analysis:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch full student analysis',
+      details: error.message
     });
   }
 });

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import DataDisplay from './DataDisplay';
+import AdminTimetableManager from './AdminTimetableManager';
 import NotificationCenter from '../components/NotificationCenter';
 import {
   Chart as ChartJS,
@@ -25,7 +26,7 @@ import {
   FaBook, FaTrash, FaBroom, FaCheckCircle, FaExclamationCircle, FaUser,
   FaDoorOpen, FaCompass, FaLightbulb, FaSave, FaBolt, FaRocket,
   FaTools, FaTimesCircle, FaBullseye, FaBrain, FaChartBar,
-  FaExclamationTriangle, FaBars, FaChevronLeft, FaHome,
+  FaExclamationTriangle, FaBars, FaChevronLeft, FaHome, FaCalendar,
   FaEdit
 } from 'react-icons/fa';
 import './AdminDashboard.css';
@@ -490,7 +491,7 @@ const DataManagement = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [columnMapping, setColumnMapping] = useState({});
-  const [dataFormat, setDataFormat] = useState('single'); // 'single' or 'multiple' subjects per row
+  const [dataFormat, setDataFormat] = useState('multiple'); // 'single' (legacy) or 'multiple' (detailed semester row)
   
   // Quick Action States
   const [showReportsModal, setShowReportsModal] = useState(false);
@@ -625,12 +626,54 @@ const DataManagement = () => {
         templateData = ['PRN', 'Month', 'Year', 'Subject Name', 'Total Classes', 'Attended Classes'];
         sampleRow = '\nPRN001,January,2024,Data Structures,20,18';
       } else {
-        templateData = ['PRN', 'Month', 'Year', 'Subject 1 Name', 'Subject 1 Total Classes', 'Subject 1 Attended', 'Subject 2 Name', 'Subject 2 Total Classes', 'Subject 2 Attended'];
-        sampleRow = '\nPRN001,January,2024,Data Structures,20,18,Algorithms,22,20';
+        templateData = [
+          'Sr. No.',
+          'PRN',
+          'Status',
+          'Roll No.',
+          'Student Name',
+          'Department',
+          'DSA - Total Lectures',
+          'DSA - Attended',
+          'DSA - Percentage',
+          'OOP - Total Lectures',
+          'OOP - Attended',
+          'OOP - Percentage',
+          'BCN - Total Lectures',
+          'BCN - Attended',
+          'BCN - Percentage',
+          'Open Elective-1 - Total Lectures',
+          'Open Elective-1 - Attended',
+          'Open Elective-1 - Percentage',
+          'DELD - Total Lectures',
+          'DELD - Attended',
+          'DELD - Percentage',
+          'PME - Total Lectures',
+          'PME - Attended',
+          'PME - Percentage',
+          'UHV - Total Lectures',
+          'UHV - Attended',
+          'UHV - Percentage',
+          'DSAL - Total Practicals',
+          'DSAL - Attended',
+          'DSAL - Percentage',
+          'OOPL - Total Practicals',
+          'OOPL - Attended',
+          'OOPL - Percentage',
+          'CEPL - Total Practicals',
+          'CEPL - Attended',
+          'CEPL - Percentage',
+          'PMEL - Total Practicals',
+          'PMEL - Attended',
+          'PMEL - Percentage',
+          'Total Theory Lectures Attended',
+          'Total Lab Practicals Attended'
+        ];
+        sampleRow = '\n1,PRN001,Regular,101,John Doe,Computer Engineering,40,36,90,38,35,92.11,35,30,85.71,30,28,93.33,32,29,90.63,34,31,91.18,20,18,90,24,22,91.67,22,20,90.91,21,19,90.48,20,18,90,207,79';
       }
     } else if (uploadType === 'students') {
-      templateData = ['PRN', 'Roll No', 'Student Name', 'Year', 'Branch', 'Division', 'Email', 'Mobile No'];
-      sampleRow = '\nPRN001,101,John Doe,First,Computer Science,A,john@example.com,9876543210';
+      templateData = ['Sr. No.', 'PRN', 'Status', 'Seat no', 'Roll No', 'Student Name', 'Year', 'Department', 'Branch', 'Division', 'Email', 'Mobile No'];
+      sampleRow = '\n1,PRN001,Regular,101,101,John Doe,First,Computer Engineering,Computer Engineering,A,john@example.com,9876543210';
     } else {
       templateData = ['Faculty ID', 'Faculty Name', 'Email', 'Mobile No', 'Department', 'Designation'];
       sampleRow = '\nFAC001,Dr. Jane Smith,jane@example.com,9876543210,Computer Science,Professor';
@@ -659,7 +702,7 @@ const DataManagement = () => {
         ? `/api/students/${editingRecord.prn}` 
         : `/api/faculty/${editingRecord.facultyId}`;
       
-      await axios.put(endpoint, editForm, {
+      await axios.put(`${API_BASE_URL}${endpoint}`, editForm, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -680,7 +723,7 @@ const DataManagement = () => {
           ? `/api/students/${record.prn}` 
           : `/api/faculty/${record.facultyId}`;
         
-        await axios.delete(endpoint, {
+        await axios.delete(`${API_BASE_URL}${endpoint}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -723,7 +766,7 @@ const DataManagement = () => {
       const token = localStorage.getItem('token');
       const endpoint = activeTab === 'students' ? '/api/students' : '/api/faculty';
       
-      await axios.post(endpoint, editForm, {
+      await axios.post(`${API_BASE_URL}${endpoint}`, editForm, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -849,15 +892,61 @@ const DataManagement = () => {
     }
   };
 
+  const handleDeleteAllData = async () => {
+    const confirmed = window.confirm(
+      'This will delete ALL data from the database in one click. Admin users will be preserved by default. Continue?'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const typed = window.prompt('Type DELETE to confirm this action.');
+    if (typed !== 'DELETE') {
+      setQuickActionStatus('[WARN] Database delete cancelled. Confirmation text did not match.');
+      setTimeout(() => setQuickActionStatus(''), 5000);
+      return;
+    }
+
+    try {
+      setQuickActionStatus('🔄 Deleting all database data...');
+      const token = localStorage.getItem('token');
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/admin/reset-database`,
+        {
+          confirmationText: 'DELETE ALL DATA',
+          preserveAdminUsers: true
+        },
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+
+      const totalDeleted = response?.data?.totalDeleted ?? 0;
+      setQuickActionStatus(`[OK] Database cleared successfully. Deleted records: ${totalDeleted}`);
+      fetchData();
+      setTimeout(() => setQuickActionStatus(''), 7000);
+    } catch (error) {
+      console.error('Delete all data error:', error);
+      setQuickActionStatus(`[ERR] Failed to delete data: ${error.response?.data?.message || error.message}`);
+      setTimeout(() => setQuickActionStatus(''), 7000);
+    }
+  };
+
   // Define mapping fields per upload type so JSX stays simple
   const mappingFields = useMemo(() => {
     switch (uploadType) {
       case 'students':
         return [
+          { key: 'srNo', label: 'Sr. No.' },
           { key: 'prn', label: 'PRN' },
+          { key: 'status', label: 'Status' },
+          { key: 'seatNo', label: 'Seat no' },
           { key: 'rollNo', label: 'Roll No' },
           { key: 'studentName', label: 'Student Name' },
           { key: 'year', label: 'Year' },
+          { key: 'department', label: 'Department' },
           { key: 'branch', label: 'Branch' },
           { key: 'division', label: 'Division' },
           { key: 'email', label: 'Email' },
@@ -897,12 +986,52 @@ const DataManagement = () => {
       case 'attendance':
       default:
         return [
+          { key: 'srNo', label: 'Sr. No.' },
           { key: 'prn', label: 'PRN' },
-          { key: 'month', label: 'Month' },
-          { key: 'year', label: 'Year' },
-          { key: 'subjectName', label: 'Subject Name' },
-          { key: 'totalClasses', label: 'Total Classes' },
-          { key: 'attendedClasses', label: 'Attended Classes' }
+          { key: 'status', label: 'Status' },
+          { key: 'rollNo', label: 'Roll No.' },
+          { key: 'studentName', label: 'Student Name' },
+          { key: 'department', label: 'Department' },
+          { key: 'dsaTotalLectures', label: 'DSA - Total Lectures' },
+          { key: 'dsaAttended', label: 'DSA - Attended' },
+          { key: 'dsaPercentage', label: 'DSA - Percentage' },
+          { key: 'oopTotalLectures', label: 'OOP - Total Lectures' },
+          { key: 'oopAttended', label: 'OOP - Attended' },
+          { key: 'oopPercentage', label: 'OOP - Percentage' },
+          { key: 'bcnTotalLectures', label: 'BCN - Total Lectures' },
+          { key: 'bcnAttended', label: 'BCN - Attended' },
+          { key: 'bcnPercentage', label: 'BCN - Percentage' },
+          { key: 'openElective1TotalLectures', label: 'Open Elective-1 - Total Lectures' },
+          { key: 'openElective1Attended', label: 'Open Elective-1 - Attended' },
+          { key: 'openElective1Percentage', label: 'Open Elective-1 - Percentage' },
+          { key: 'deldTotalLectures', label: 'DELD - Total Lectures' },
+          { key: 'deldAttended', label: 'DELD - Attended' },
+          { key: 'deldPercentage', label: 'DELD - Percentage' },
+          { key: 'pmeTotalLectures', label: 'PME - Total Lectures' },
+          { key: 'pmeAttended', label: 'PME - Attended' },
+          { key: 'pmePercentage', label: 'PME - Percentage' },
+          { key: 'uhvTotalLectures', label: 'UHV - Total Lectures' },
+          { key: 'uhvAttended', label: 'UHV - Attended' },
+          { key: 'uhvPercentage', label: 'UHV - Percentage' },
+          { key: 'dsalTotalPracticals', label: 'DSAL - Total Practicals' },
+          { key: 'dsalAttended', label: 'DSAL - Attended' },
+          { key: 'dsalPercentage', label: 'DSAL - Percentage' },
+          { key: 'ooplTotalPracticals', label: 'OOPL - Total Practicals' },
+          { key: 'ooplAttended', label: 'OOPL - Attended' },
+          { key: 'ooplPercentage', label: 'OOPL - Percentage' },
+          { key: 'ceplTotalPracticals', label: 'CEPL - Total Practicals' },
+          { key: 'ceplAttended', label: 'CEPL - Attended' },
+          { key: 'ceplPercentage', label: 'CEPL - Percentage' },
+          { key: 'pmelTotalPracticals', label: 'PMEL - Total Practicals' },
+          { key: 'pmelAttended', label: 'PMEL - Attended' },
+          { key: 'pmelPercentage', label: 'PMEL - Percentage' },
+          { key: 'totalTheoryLecturesAttended', label: 'Total Theory Lectures Attended' },
+          { key: 'totalLabPracticalsAttended', label: 'Total Lab Practicals Attended' },
+          { key: 'month', label: 'Month (optional)' },
+          { key: 'year', label: 'Year (optional)' },
+          { key: 'subjectName', label: 'Subject Name (legacy)' },
+          { key: 'totalClasses', label: 'Total Classes (legacy)' },
+          { key: 'attendedClasses', label: 'Attended Classes (legacy)' }
         ];
     }
   }, [uploadType]);
@@ -953,6 +1082,13 @@ const DataManagement = () => {
             <span className="action-icon"><FaDatabase /></span>
             <span>Backup Data</span>
           </button>
+          <button 
+            className="quick-action-btn quick-action-danger"
+            onClick={handleDeleteAllData}
+          >
+            <span className="action-icon danger"><FaTrash /></span>
+            <span>Delete All Data</span>
+          </button>
         </div>
       </div>
 
@@ -980,8 +1116,8 @@ const DataManagement = () => {
                 value={dataFormat}
                 onChange={(e) => setDataFormat(e.target.value)}
               >
-                <option value="single">Single Subject Per Row</option>
-                <option value="multiple">Multiple Subjects Per Row</option>
+                <option value="multiple">Detailed Semester Row (Recommended)</option>
+                <option value="single">Single Subject Per Row (Legacy)</option>
               </select>
             )}
 
@@ -1054,10 +1190,14 @@ const DataManagement = () => {
             <h4><FaEdit /> Required Fields for {uploadType.charAt(0).toUpperCase() + uploadType.slice(1)}:</h4>
             {uploadType === 'students' ? (
               <div className="fields-list">
+                <div><strong>Sr. No.</strong> - Serial number (Optional)</div>
                 <div><strong>PRN</strong> - Unique Student ID (Required)</div>
+                <div><strong>Status</strong> - Student status (Optional)</div>
+                <div><strong>Seat no</strong> - Seat/Exam number (Optional)</div>
                 <div><strong>Roll No</strong> - College Roll Number (Required)</div>
                 <div><strong>Student Name</strong> - Full Name (Required)</div>
                 <div><strong>Year</strong> - First, Second, Third, or Fourth (Required)</div>
+                <div><strong>Department</strong> - Department name (Optional, auto-syncs with Branch)</div>
                 <div><strong>Branch</strong> - Department/Branch (Required)</div>
                 <div><strong>Division</strong> - Class Division (Required)</div>
                 <div><strong>Email</strong> - Student Email (Required)</div>
@@ -1100,24 +1240,25 @@ const DataManagement = () => {
             ) : uploadType === 'attendance' ? (
               <div>
                 <div className="format-badge">
-                  <strong><FaClipboardList /> Current Format:</strong> {dataFormat === 'single' ? 'Single Subject Per Row' : 'Multiple Subjects Per Row'}
+                  <strong><FaClipboardList /> Current Format:</strong> {dataFormat === 'single' ? 'Single Subject Per Row (Legacy)' : 'Detailed Semester Row'}
                 </div>
                 <div className="fields-list">
                   <div><strong>PRN</strong> - Student PRN to link attendance (Required)</div>
-                  <div><strong>Month</strong> - Month name (January, February, etc.) (Required)</div>
-                  <div><strong>Year</strong> - Year (2024, 2025, etc.) (Required)</div>
                   {dataFormat === 'single' ? (
                     <>
+                      <div><strong>Month</strong> - Month name (January, February, etc.) (Required)</div>
+                      <div><strong>Year</strong> - Year (2024, 2025, etc.) (Required)</div>
                       <div><strong>Subject Name</strong> - Subject name (Required)</div>
                       <div><strong>Total Classes</strong> - Total classes conducted (Required)</div>
                       <div><strong>Attended Classes</strong> - Classes attended by student (Required)</div>
                     </>
                   ) : (
                     <>
-                      <div><strong>Subject N Name</strong> - Subject name (e.g., Subject 1 Name, Subject 2 Name, etc.)</div>
-                      <div><strong>Subject N Total Classes</strong> - Total classes for subject N</div>
-                      <div><strong>Subject N Attended</strong> - Attended classes for subject N</div>
-                      <div><strong><FaLightbulb /> Tip:</strong> Add as many subjects as needed (Subject 1, Subject 2, Subject 3...)</div>
+                      <div><strong>Core Columns</strong> - Sr. No., PRN, Status, Roll No., Student Name, Department</div>
+                      <div><strong>Theory Columns</strong> - DSA/OOP/BCN/Open Elective-1/DELD/PME/UHV with Total, Attended, Percentage</div>
+                      <div><strong>Practical Columns</strong> - DSAL/OOPL/CEPL/PMEL with Total Practicals, Attended, Percentage</div>
+                      <div><strong>Summary Columns</strong> - Total Theory Lectures Attended, Total Lab Practicals Attended</div>
+                      <div><strong><FaLightbulb /> Tip:</strong> Month and Year are optional in detailed format. The system stores them as Overall and current year when omitted.</div>
                     </>
                   )}
                 </div>
@@ -1848,7 +1989,7 @@ const MLModelControl = () => {
   // ML API + Analysis states
   const [modelInfo, setModelInfo] = useState(null);
   const [analysisFilters, setAnalysisFilters] = useState({
-    year: 'First',
+    year: '',
     branch: '',
     division: '',
     subjectName: ''
@@ -1859,73 +2000,123 @@ const MLModelControl = () => {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
 
-  useEffect(() => {
-    // Mock training data
-    setTrainingData({
-      totalRecords: 1250,
-      features: 4,
-      lastTrained: '2024-01-15 14:30:00'
-    });
+  const normalizeScope = () => ({
+    year: analysisFilters.year && analysisFilters.year !== 'All' ? analysisFilters.year : undefined,
+    branch: analysisFilters.branch || undefined,
+    division: analysisFilters.division || undefined
+  });
 
-    // Fetch ML model info from ML API
-    const fetchModelInfo = async () => {
-      try {
-        const res = await axios.get('http://localhost:5001/model-info');
-        setModelInfo(res.data);
-        setModelMetrics((prev) => ({
-          ...prev,
-          accuracy: res.data?.accuracy || prev.accuracy
-        }));
-      } catch (e) {
-        // leave modelInfo null if ML API not reachable
-      }
-    };
-    fetchModelInfo();
+  const refreshModelInfo = async () => {
+    try {
+      setAnalysisError('');
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_BASE_URL}/api/ml-analysis/model-info`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const info = res.data || {};
+      setModelInfo(info);
+      setModelStatus(info.trained ? 'Trained' : 'Not Trained');
+      setModelMetrics({
+        accuracy: Number(((info.metrics?.accuracy ?? 0) * 100).toFixed(2)),
+        precision: Number(((info.metrics?.precision ?? 0) * 100).toFixed(2)),
+        recall: Number(((info.metrics?.recall ?? 0) * 100).toFixed(2)),
+        f1Score: Number(((info.metrics?.f1_score ?? 0) * 100).toFixed(2))
+      });
+      setTrainingData({
+        totalRecords: info.rows_used || 0,
+        features: Array.isArray(info.features) ? info.features.length : 0,
+        lastTrained: info.lastTrained || 'Never'
+      });
+    } catch (e) {
+      setModelStatus('Not Trained');
+      setAnalysisError(`ML API unavailable or model info failed: ${e.response?.data?.error || e.message}`);
+    }
+  };
+
+  useEffect(() => {
+    refreshModelInfo();
   }, []);
 
   const trainModel = async () => {
     setModelStatus('Training...');
     setTrainingProgress(0);
     try {
-      // Call ML API to start training (simulated)
-      await axios.post('http://localhost:5001/train');
-    } catch (e) {
-      // continue with UI simulation even if API not reachable
-    }
-    const interval = setInterval(() => {
-      setTrainingProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setModelStatus('Trained');
-          setModelMetrics({
-            accuracy: 85.5,
-            precision: 83.2,
-            recall: 87.1,
-            f1Score: 85.1
-          });
-          setTrainingData(prev => ({
-            ...prev,
-            lastTrained: new Date().toLocaleString()
-          }));
-          return 100;
-        }
-        return prev + 5;
+      const token = localStorage.getItem('token');
+      const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/train-model`, normalizeScope(), {
+        headers: { Authorization: `Bearer ${token}` }
       });
-    }, 200);
+
+      const metrics = res.data?.metrics || {};
+      const featureImportance = res.data?.feature_importance || {};
+      const rowsUsed = res.data?.rows_used || 0;
+      const features = res.data?.features || [];
+
+      setTrainingProgress(100);
+      setModelStatus('Trained');
+      setModelInfo((prev) => ({
+        ...(prev || {}),
+        trained: true,
+        features,
+        metrics,
+        featureImportance,
+        lastTrained: res.data?.last_trained || new Date().toISOString(),
+        rows_used: rowsUsed
+      }));
+      setModelMetrics({
+        accuracy: Number(((metrics.accuracy ?? 0) * 100).toFixed(2)),
+        precision: Number(((metrics.precision ?? 0) * 100).toFixed(2)),
+        recall: Number(((metrics.recall ?? 0) * 100).toFixed(2)),
+        f1Score: Number(((metrics.f1_score ?? 0) * 100).toFixed(2))
+      });
+      setTrainingData({
+        totalRecords: rowsUsed,
+        features: Array.isArray(features) ? features.length : 0,
+        lastTrained: res.data?.last_trained || new Date().toLocaleString()
+      });
+      setAnalysisError('');
+    } catch (e) {
+      setModelStatus('Not Trained');
+      setAnalysisError(e.response?.data?.error || e.message);
+    }
   };
 
-  const evaluateModel = () => {
-    setModelMetrics({
-      accuracy: 85.5,
-      precision: 83.2,
-      recall: 87.1,
-      f1Score: 85.1
-    });
-    alert('Model evaluation completed!');
+  const evaluateModel = async () => {
+    try {
+      await refreshModelInfo();
+      alert('Model evaluation refreshed from current trained model.');
+    } catch (error) {
+      alert('Model evaluation failed: ' + (error.response?.data?.error || error.message));
+    }
   };
 
-  const exportModel = () => {
-    alert('Model exported successfully!');
+  const loadModel = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_BASE_URL}/api/ml-analysis/load-model`, {
+        path: 'models/performance_model.joblib'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      await refreshModelInfo();
+      alert('Model loaded successfully.');
+    } catch (error) {
+      setAnalysisError(error.response?.data?.error || error.message);
+      alert('Model load failed: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const exportModel = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_BASE_URL}/api/ml-analysis/save-model`, {
+        path: 'models/performance_model.joblib'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert('Model exported successfully.');
+    } catch (error) {
+      alert('Model export failed: ' + (error.response?.data?.error || error.message));
+    }
   };
 
   return (
@@ -1993,6 +2184,9 @@ const MLModelControl = () => {
               <button onClick={exportModel} className="btn btn-warning">
                 ▦ Export Model
               </button>
+              <button onClick={loadModel} className="btn btn-secondary">
+                <FaUpload /> Load Model
+              </button>
             </div>
           </div>
         </div>
@@ -2028,38 +2222,25 @@ const MLModelControl = () => {
             <h2 className="card-title">⌕ Feature Importance</h2>
           </div>
           <div className="feature-importance">
-            <div className="feature-bar">
-              <span className="feature-name">Attendance %</span>
-              <div className="feature-progress">
-                <div className="feature-fill" style={{ width: '85%' }}>
-                  <span className="feature-percentage">85%</span>
-                </div>
-              </div>
-            </div>
-            <div className="feature-bar">
-              <span className="feature-name">In-Sem Marks</span>
-              <div className="feature-progress">
-                <div className="feature-fill" style={{ width: '78%' }}>
-                  <span className="feature-percentage">78%</span>
-                </div>
-              </div>
-            </div>
-            <div className="feature-bar">
-              <span className="feature-name">End-Sem CGPA</span>
-              <div className="feature-progress">
-                <div className="feature-fill" style={{ width: '92%' }}>
-                  <span className="feature-percentage">92%</span>
-                </div>
-              </div>
-            </div>
-            <div className="feature-bar">
-              <span className="feature-name">Credits Completed</span>
-              <div className="feature-progress">
-                <div className="feature-fill" style={{ width: '65%' }}>
-                  <span className="feature-percentage">65%</span>
-                </div>
-              </div>
-            </div>
+            {Object.keys(modelInfo?.featureImportance || {}).length > 0 ? (
+              Object.entries(modelInfo.featureImportance)
+                .sort((a, b) => b[1] - a[1])
+                .map(([feature, value]) => {
+                  const pct = Math.max(1, Math.min(100, Number((value * 100).toFixed(2))));
+                  return (
+                    <div className="feature-bar" key={feature}>
+                      <span className="feature-name">{feature}</span>
+                      <div className="feature-progress">
+                        <div className="feature-fill" style={{ width: `${pct}%` }}>
+                          <span className="feature-percentage">{pct}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+            ) : (
+              <div style={{ color: 'var(--muted)' }}>Train the model to view feature importance.</div>
+            )}
           </div>
         </div>
       </div>
@@ -2080,6 +2261,7 @@ const MLModelControl = () => {
                   value={analysisFilters.year}
                   onChange={(e) => setAnalysisFilters({ ...analysisFilters, year: e.target.value })}
                 >
+                  <option value="">All</option>
                   <option value="First">First</option>
                   <option value="Second">Second</option>
                   <option value="Third">Third</option>
@@ -2120,11 +2302,7 @@ const MLModelControl = () => {
                   setAnalysisLoading(true);
                   setAnalysisError('');
                   const token = localStorage.getItem('token');
-                  const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/class-statistics`, {
-                    year: analysisFilters.year,
-                    branch: analysisFilters.branch,
-                    division: analysisFilters.division
-                  }, { headers: { Authorization: `Bearer ${token}` } });
+                  const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/class-statistics`, normalizeScope(), { headers: { Authorization: `Bearer ${token}` } });
                   setClassStats(res.data);
                 } catch (e) {
                   setAnalysisError(e.response?.data?.error || e.message);
@@ -2137,11 +2315,7 @@ const MLModelControl = () => {
                   setAnalysisLoading(true);
                   setAnalysisError('');
                   const token = localStorage.getItem('token');
-                  const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/at-risk-students`, {
-                    year: analysisFilters.year,
-                    branch: analysisFilters.branch,
-                    division: analysisFilters.division
-                  }, { headers: { Authorization: `Bearer ${token}` } });
+                  const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/at-risk-students`, normalizeScope(), { headers: { Authorization: `Bearer ${token}` } });
                   setAtRisk(res.data);
                 } catch (e) {
                   setAnalysisError(e.response?.data?.error || e.message);
@@ -2156,9 +2330,7 @@ const MLModelControl = () => {
                   const token = localStorage.getItem('token');
                   const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/subject-analysis`, {
                     subject_name: analysisFilters.subjectName || 'All Subjects',
-                    year: analysisFilters.year,
-                    branch: analysisFilters.branch,
-                    division: analysisFilters.division
+                    ...normalizeScope()
                   }, { headers: { Authorization: `Bearer ${token}` } });
                   setSubjectStats(res.data);
                 } catch (e) {
@@ -2186,10 +2358,10 @@ const MLModelControl = () => {
                   <div className="output-block">
                     <h3>Model Info</h3>
                     <div className="output-grid">
-                      <div><strong>Type:</strong> {modelInfo.modelType}</div>
-                      <div><strong>Version:</strong> {modelInfo.version}</div>
-                      <div><strong>Accuracy:</strong> {modelInfo.accuracy}%</div>
-                      <div><strong>Last Trained:</strong> {modelInfo.lastTrained}</div>
+                      <div><strong>Status:</strong> {modelInfo.trained ? 'Trained' : 'Not Trained'}</div>
+                      <div><strong>Rows Used:</strong> {modelInfo.rows_used ?? 0}</div>
+                      <div><strong>Features:</strong> {Array.isArray(modelInfo.features) ? modelInfo.features.length : 0}</div>
+                      <div><strong>Last Trained:</strong> {modelInfo.lastTrained || 'Never'}</div>
                     </div>
                   </div>
                 )}
@@ -2265,7 +2437,7 @@ const UserManagement = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(`${API_BASE_URL}/api/register`, newUser, {
+      const response = await axios.post(`${API_BASE_URL}/api/auth/register`, newUser, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -2282,9 +2454,16 @@ const UserManagement = () => {
   const handleDeleteUser = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        alert('User deletion feature would be implemented with backend API');
+        const token = localStorage.getItem('token');
+        await axios.delete(`${API_BASE_URL}/api/users/${userId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        fetchUsers();
+        alert('User deleted successfully!');
       } catch (error) {
-        alert('Error deleting user: ' + error.message);
+        alert('Error deleting user: ' + (error.response?.data?.message || error.message));
       }
     }
   };
@@ -2535,6 +2714,7 @@ const AdminDashboard = () => {
     { path: '/admin', label: 'Dashboard', icon: <FaTachometerAlt />, component: DashboardOverview },
     { path: '/admin/data', label: 'Data Display', icon: <FaChartLine />, component: DataDisplay },
     { path: '/admin/manage', label: 'Data Management', icon: <FaDatabase />, component: DataManagement },
+    { path: '/admin/timetable', label: 'Timetable', icon: <FaCalendar />, component: AdminTimetableManager },
     { path: '/admin/ml', label: 'ML Model', icon: <FaRobot />, component: MLModelControl },
     { path: '/admin/users', label: 'User Management', icon: <FaUsers />, component: UserManagement },
     { path: '/admin/change-requests', label: 'Change Requests', icon: <FaSyncAlt />, component: ChangeRequestsManagement },

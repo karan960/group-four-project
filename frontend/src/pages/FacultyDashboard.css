@@ -2,7 +2,7 @@
   display: flex;
   min-height: 100vh;
   background: var(--bg);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-body, 'Sora', 'Segoe UI', sans-serif);
 }
 
 /* Sticky header + consistent content width to match admin */
@@ -368,3 +368,151 @@
 
 /* Import all other styles from StudentDashboard.css */
 /* Since the interface is identical, we can reuse the same CSS structure */
+
+/* Students analysis table + details styles */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.data-table th {
+  background: var(--table-header);
+  color: var(--text);
+  padding: 0.9rem;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table td {
+  padding: 0.9rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.data-table tbody tr:hover {
+  background: var(--table-header);
+}
+
+.btn-small {
+  border: none;
+  border-radius: 6px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-small.btn-primary {
+  background: var(--primary);
+  color: var(--card-bg);
+}
+
+.btn-small.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.output-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.faculty-dashboard pre {
+  background: var(--table-header);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  max-height: 300px;
+  overflow: auto;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 992px) {
+  .faculty-dashboard .main-header {
+    padding: 1rem 1.25rem;
+  }
+
+  .faculty-dashboard .page-content {
+    margin: 1rem;
+    padding: 1rem;
+  }
+
+  .faculty-dashboard .header-actions {
+    flex-wrap: wrap;
+  }
+
+  .faculty-dashboard .subjects-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .faculty-dashboard .sidebar {
+    width: 84px !important;
+  }
+
+  .faculty-dashboard .sidebar-header {
+    padding: 1rem 0.6rem;
+  }
+
+  .faculty-dashboard .sidebar-toggle {
+    margin: 0 auto 0.75rem;
+  }
+
+  .faculty-dashboard .logo-text,
+  .faculty-dashboard .nav-label,
+  .faculty-dashboard .sidebar-footer {
+    display: none !important;
+  }
+
+  .faculty-dashboard .sidebar-nav .nav-item,
+  .faculty-dashboard .nav-item {
+    justify-content: center;
+    grid-template-columns: 1fr;
+    padding: 0.85rem 0.5rem;
+    border-left: none;
+  }
+
+  .faculty-dashboard .nav-icon {
+    margin-right: 0 !important;
+  }
+
+  .faculty-dashboard .main-content {
+    margin-left: 84px !important;
+  }
+
+  .faculty-dashboard .main-header {
+    padding: 0.85rem 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .faculty-dashboard .header-right,
+  .faculty-dashboard .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .faculty-dashboard .page-content {
+    margin: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .faculty-dashboard .data-table {
+    font-size: 0.84rem;
+  }
+}

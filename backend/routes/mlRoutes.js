@@ -38,13 +38,13 @@ router.post('/predict/:prn', async (req, res) => {
         timeout: 10000
       });
 
-      const prediction = mlResponse.data;
+      const predictionPayload = mlResponse.data?.prediction || mlResponse.data;
 
       // Update student with prediction results
-      student.predictedCGPA = prediction.predictedCGPA;
-      student.placementProbability = prediction.placementProbability;
-      student.riskCategory = prediction.riskCategory;
-      student.recommendations = prediction.recommendations;
+      student.predictedCGPA = predictionPayload.predictedCGPA;
+      student.placementProbability = predictionPayload.placementProbability;
+      student.riskCategory = predictionPayload.riskCategory;
+      student.recommendations = predictionPayload.recommendations;
       student.lastPredictionDate = new Date();
 
       await student.save();
@@ -52,11 +52,11 @@ router.post('/predict/:prn', async (req, res) => {
       res.json({
         message: 'Prediction generated successfully',
         prediction: {
-          predictedCGPA: prediction.predictedCGPA,
-          placementProbability: prediction.placementProbability,
-          riskCategory: prediction.riskCategory,
-          recommendations: prediction.recommendations,
-          confidence: prediction.confidence
+          predictedCGPA: predictionPayload.predictedCGPA,
+          placementProbability: predictionPayload.placementProbability,
+          riskCategory: predictionPayload.riskCategory,
+          recommendations: predictionPayload.recommendations,
+          confidence: predictionPayload.confidence
         }
       });
     } catch (mlError) {
@@ -121,7 +121,7 @@ router.post('/predict/batch', async (req, res) => {
           const mlResponse = await axios.post(`${ML_API_URL}/predict`, mlData, {
             timeout: 5000
           });
-          prediction = mlResponse.data;
+          prediction = mlResponse.data?.prediction || mlResponse.data;
         } catch {
           prediction = generateBasicPrediction(student);
         }

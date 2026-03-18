@@ -30,14 +30,35 @@ const semesterMarksSchema = new mongoose.Schema({
 
 // Sub-schema for attendance
 const attendanceSchema = new mongoose.Schema({
+  srNo: Number,
+  status: String,
+  rollNo: String,
+  studentName: String,
+  department: String,
   month: String,
   year: Number,
   subjects: [{
     subjectName: String,
+    type: { type: String, enum: ['theory', 'practical'] },
     totalClasses: Number,
     attendedClasses: Number,
     percentage: Number
   }],
+  theorySubjects: [{
+    subjectName: String,
+    totalLectures: Number,
+    attendedLectures: Number,
+    percentage: Number
+  }],
+  practicalSubjects: [{
+    subjectName: String,
+    totalPracticals: Number,
+    attendedPracticals: Number,
+    percentage: Number
+  }],
+  totalTheoryLecturesAttended: Number,
+  totalLabPracticalsAttended: Number,
+  overall: Number,
   overallPercentage: Number
 });
 
@@ -52,6 +73,10 @@ const studentSchema = new mongoose.Schema({
     enum: ['First', 'Second', 'Third', 'Fourth'],
     default: 'First'
   },
+  srNo: { type: Number },
+  status: { type: String },
+  seatNo: { type: String },
+  department: { type: String },
   branch: { type: String, required: true },
   division: { type: String, required: true },
   email: { type: String, required: true },
@@ -130,6 +155,18 @@ const studentSchema = new mongoose.Schema({
 // Index for faster queries
 studentSchema.index({ prn: 1 });
 studentSchema.index({ year: 1, branch: 1, division: 1 });
+studentSchema.index({ year: 1, department: 1, division: 1 });
 studentSchema.index({ placementStatus: 1 });
+
+// Keep branch and department in sync so legacy and new payloads both work.
+studentSchema.pre('validate', function syncBranchAndDepartment(next) {
+  if (!this.branch && this.department) {
+    this.branch = this.department;
+  }
+  if (!this.department && this.branch) {
+    this.department = this.branch;
+  }
+  next();
+});
 
 module.exports = mongoose.model('Student', studentSchema);

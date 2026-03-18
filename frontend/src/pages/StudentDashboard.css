@@ -2,7 +2,7 @@
   display: flex;
   min-height: 100vh;
   background: var(--bg);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-body, 'Sora', 'Segoe UI', sans-serif);
 }
 
 /* Make header sticky and ensure consistent layout spacing */
@@ -705,6 +705,33 @@
   color: var(--muted);
 }
 
+/* Full analysis section */
+.student-dashboard details {
+  margin-top: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--table-header);
+  padding: 0.6rem 0.8rem;
+}
+
+.student-dashboard details summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.student-dashboard details pre {
+  margin-top: 0.8rem;
+  max-height: 280px;
+  overflow: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
 /* Attendance Table */
 .attendance-table {
   overflow-x: auto;
@@ -977,5 +1004,79 @@
   
   .quick-actions-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 992px) {
+  .student-dashboard .main-header {
+    padding: 1rem 1.25rem;
+  }
+
+  .student-dashboard .page-content {
+    margin: 1rem;
+    padding: 1rem;
+  }
+
+  .student-dashboard .header-actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .student-dashboard .sidebar {
+    width: 84px !important;
+    transform: none !important;
+  }
+
+  .student-dashboard .sidebar-header {
+    padding: 1rem 0.6rem;
+  }
+
+  .student-dashboard .sidebar-toggle {
+    margin: 0 auto 0.75rem;
+  }
+
+  .student-dashboard .logo-text,
+  .student-dashboard .nav-label,
+  .student-dashboard .sidebar-footer {
+    display: none !important;
+  }
+
+  .student-dashboard .sidebar-nav .nav-item {
+    justify-content: center;
+    grid-template-columns: 1fr;
+    padding: 0.85rem 0.5rem;
+    border-left: none;
+  }
+
+  .student-dashboard .sidebar-nav .nav-icon {
+    margin-right: 0 !important;
+  }
+
+  .student-dashboard .main-content {
+    margin-left: 84px !important;
+  }
+
+  .student-dashboard .main-header {
+    padding: 0.85rem 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .student-dashboard .header-right,
+  .student-dashboard .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .student-dashboard .page-content {
+    margin: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .student-dashboard .data-table {
+    font-size: 0.84rem;
   }
 }

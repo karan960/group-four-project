@@ -1,0 +1,73 @@
+.timetable-card {
+  margin-top: 1rem;
+}
+
+.timetable-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.timetable-subtitle {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.timetable-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.timetable-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  color: var(--text);
+}
+
+.timetable-table-wrap {
+  overflow-x: auto;
+}
+
+.timetable-table th,
+.timetable-table td {
+  vertical-align: top;
+  min-width: 150px;
+}
+
+.timetable-time-cell {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.timetable-entry-chip {
+  background: var(--table-header);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  margin-bottom: 0.45rem;
+}
+
+.timetable-entry-chip:last-child {
+  margin-bottom: 0;
+}
+
+.entry-main {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.entry-meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+}
+
+.timetable-muted {
+  color: var(--muted);
+}

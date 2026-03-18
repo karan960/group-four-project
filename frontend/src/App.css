@@ -15,11 +15,22 @@ html, body {
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-body, 'Sora', 'Segoe UI', sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-body, 'Sora', 'Segoe UI', sans-serif);
+}
 :root {
+  --font-heading: 'Sora', 'Segoe UI', sans-serif;
+  --font-body: 'Sora', 'Segoe UI', sans-serif;
+  --font-data: 'JetBrains Mono', 'Consolas', monospace;
+
   /* Background Colors */
   --bg: #f8f9fa;
   --bg-alt: #f0f2f5;
@@ -101,6 +112,19 @@ body {
   --radius-xl: 16px;
   --radius-2xl: 20px;
   --radius-full: 9999px;
+
+  /* Dashboard-specific design tokens */
+  --dashboard-content-bg: #eef4ff;
+  --dashboard-surface: #ffffff;
+  --dashboard-surface-alt: #f4f9ff;
+  --dashboard-border: #d4e0f4;
+  --dashboard-soft-shadow: 0 10px 28px rgba(16, 24, 40, 0.08);
+  --dashboard-hover-shadow: 0 14px 30px rgba(16, 24, 40, 0.12);
+  --dashboard-sidebar-hover: rgba(255, 255, 255, 0.10);
+  --dashboard-sidebar-active: rgba(255, 255, 255, 0.18);
+  --dashboard-focus-ring: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  --dashboard-sidebar-gradient: linear-gradient(165deg, #0f1a38 0%, #1b2b63 40%, #2e2f77 72%, #3b2e7c 100%);
+  --dashboard-header-gradient: linear-gradient(100deg, rgba(59, 130, 246, 0.12), rgba(99, 102, 241, 0.08), rgba(6, 182, 212, 0.1));
 }
 
 .dark {
@@ -172,6 +196,19 @@ body {
   --gradient-danger: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
   --gradient-info: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
   --gradient-warm: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+
+  /* Dashboard-specific design tokens (dark mode) */
+  --dashboard-content-bg: #070f23;
+  --dashboard-surface: #121d36;
+  --dashboard-surface-alt: #1a2a47;
+  --dashboard-border: #2c3f63;
+  --dashboard-soft-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  --dashboard-hover-shadow: 0 18px 34px rgba(0, 0, 0, 0.65);
+  --dashboard-sidebar-hover: rgba(255, 255, 255, 0.14);
+  --dashboard-sidebar-active: rgba(255, 255, 255, 0.22);
+  --dashboard-focus-ring: 0 0 0 3px rgba(129, 140, 248, 0.28);
+  --dashboard-sidebar-gradient: linear-gradient(165deg, #0a132d 0%, #152453 42%, #202a67 74%, #32286f 100%);
+  --dashboard-header-gradient: linear-gradient(100deg, rgba(59, 130, 246, 0.18), rgba(99, 102, 241, 0.14), rgba(6, 182, 212, 0.14));
 }
 
 * {
@@ -187,7 +224,7 @@ html, body {
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-body, 'Sora', 'Segoe UI', sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg);
@@ -945,4 +982,133 @@ textarea.form-control {
     transform: translateY(0);
     opacity: 1;
   }
+}
+
+/* ========================================
+   DASHBOARD THEME HARMONIZATION
+   ======================================== */
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) {
+  font-family: var(--font-body, 'Sora', 'Segoe UI', sans-serif);
+  color: var(--text);
+  background: var(--dashboard-content-bg);
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) h1,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) h2,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) h3,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) h4,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) h5,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) h6 {
+  font-family: var(--font-heading, 'Sora', 'Segoe UI', sans-serif);
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .page-content {
+  background: var(--dashboard-content-bg);
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .main-header,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .card,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .subject-card,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .activity-item,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .table-responsive,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .data-display-section,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .profile-menu,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .stat-card {
+  background: var(--dashboard-surface) !important;
+  border-color: var(--dashboard-border) !important;
+  box-shadow: var(--dashboard-soft-shadow);
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .sidebar {
+  background: var(--dashboard-sidebar-gradient) !important;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .main-header {
+  background: var(--dashboard-surface);
+  background-image: var(--dashboard-header-gradient);
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .profile-item,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .subject-stat,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .table tbody tr:hover,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .data-table tbody tr:hover {
+  background: var(--dashboard-surface-alt) !important;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .nav-item:hover,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .sidebar-nav .nav-item:hover {
+  background: var(--dashboard-sidebar-hover);
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .nav-item.active,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .sidebar-nav .nav-item.active {
+  background: var(--dashboard-sidebar-active);
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .form-control:focus,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .search-input:focus,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .btn:focus-visible,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .nav-item:focus-visible {
+  box-shadow: var(--dashboard-focus-ring) !important;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .stat-number,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .stat-value,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .metric-value,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .metric-number {
+  font-family: var(--font-data, 'JetBrains Mono', 'Consolas', monospace);
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .profile-avatar {
+  background: linear-gradient(135deg, var(--primary), var(--primary-700));
+  color: var(--on-primary);
+  border-color: var(--dashboard-surface);
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .table th,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .data-table th {
+  background: var(--table-header);
+  color: var(--text);
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .sidebar-nav .nav-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.25rem 1fr;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.95rem 1.25rem;
+  text-align: left;
+  line-height: 1.2;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .sidebar-nav .nav-icon {
+  margin-right: 0 !important;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .sidebar-nav .nav-label {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.student-dashboard.sidebar-collapsed .sidebar-nav .nav-item,
+.faculty-dashboard.sidebar-collapsed .sidebar-nav .nav-item,
+.admin-dashboard .sidebar.collapsed .nav-item {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.student-dashboard.sidebar-collapsed .sidebar-nav .nav-label,
+.faculty-dashboard.sidebar-collapsed .sidebar-nav .nav-label,
+.admin-dashboard .sidebar.collapsed .nav-label {
+  display: none;
 }

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -25,6 +25,26 @@ const Homepage = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
+  const analyticsRef = useRef(null);
+  const [analyticsStarted, setAnalyticsStarted] = useState(false);
+  const [metrics, setMetrics] = useState({
+    predictionAccuracy: 0,
+    activeInsights: 0,
+    connectedUsers: 0,
+    placementAssists: 0
+  });
+
+  const particleNodes = useMemo(
+    () =>
+      Array.from({ length: 28 }, (_, i) => ({
+        id: i,
+        left: `${(i * 17) % 100}%`,
+        top: `${(i * 29) % 100}%`,
+        delay: `${(i % 9) * 0.6}s`,
+        duration: `${10 + (i % 8)}s`
+      })),
+    []
+  );
 
   // Carousel slides data
   const carouselSlides = [
@@ -127,6 +147,68 @@ const Homepage = () => {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const previous = root.style.scrollBehavior;
+    root.style.scrollBehavior = 'smooth';
+
+    return () => {
+      root.style.scrollBehavior = previous;
+    };
+  }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setAnalyticsStarted(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.35 }
+    );
+
+    if (analyticsRef.current) {
+      observer.observe(analyticsRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!analyticsStarted) return;
+
+    const targets = {
+      predictionAccuracy: 96,
+      activeInsights: 1240,
+      connectedUsers: 18200,
+      placementAssists: 412
+    };
+
+    const duration = 1500;
+    const start = performance.now();
+    let rafId;
+
+    const animate = (now) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+
+      setMetrics({
+        predictionAccuracy: Math.round(targets.predictionAccuracy * eased),
+        activeInsights: Math.round(targets.activeInsights * eased),
+        connectedUsers: Math.round(targets.connectedUsers * eased),
+        placementAssists: Math.round(targets.placementAssists * eased)
+      });
+
+      if (progress < 1) {
+        rafId = window.requestAnimationFrame(animate);
+      }
+    };
+
+    rafId = window.requestAnimationFrame(animate);
+    return () => window.cancelAnimationFrame(rafId);
+  }, [analyticsStarted]);
+
   const handleGetStarted = () => {
     if (user) {
       switch(user.role) {
@@ -158,6 +240,21 @@ const Homepage = () => {
 
   return (
     <div className="homepage">
+      <div className="particle-network" aria-hidden="true">
+        {particleNodes.map((node) => (
+          <span
+            key={node.id}
+            className="particle-node"
+            style={{
+              left: node.left,
+              top: node.top,
+              animationDelay: node.delay,
+              animationDuration: node.duration
+            }}
+          />
+        ))}
+      </div>
+
       {/* Header Navigation Bar */}
       <header className="header">
         <div className="nav-container">
@@ -216,11 +313,13 @@ const Homepage = () => {
                 <img src={slide.image} alt={slide.title} className="carousel-image" />
                 <div className="carousel-overlay"></div>
                 <div className="carousel-content">
-                  <h1 className="slide-title">{slide.title}</h1>
-                  <p className="slide-description">{slide.description}</p>
-                  <button onClick={handleGetStarted} className="cta-button">
-                    Get Started
-                  </button>
+                  <div className="hero-glass-card">
+                    <h1 className="slide-title">{slide.title}</h1>
+                    <p className="slide-description">{slide.description}</p>
+                    <button onClick={handleGetStarted} className="cta-button">
+                      Get Started
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -235,6 +334,33 @@ const Homepage = () => {
                 onClick={() => setCurrentSlide(index)}
               />
             ))}
+          </div>
+        </section>
+
+        <section className="analytics-section" ref={analyticsRef}>
+          <div className="container">
+            <div className="section-header">
+              <h2>Real-time Intelligence Grid</h2>
+              <p>Live institutional signals powered by predictive models and secure data pipelines.</p>
+            </div>
+            <div className="analytics-grid">
+              <article className="analytics-card glass-card">
+                <h3>Prediction Accuracy</h3>
+                <p className="metric-figure">{metrics.predictionAccuracy}%</p>
+              </article>
+              <article className="analytics-card glass-card">
+                <h3>Active Insights</h3>
+                <p className="metric-figure">{metrics.activeInsights.toLocaleString()}</p>
+              </article>
+              <article className="analytics-card glass-card">
+                <h3>Connected Users</h3>
+                <p className="metric-figure">{metrics.connectedUsers.toLocaleString()}</p>
+              </article>
+              <article className="analytics-card glass-card">
+                <h3>Placement Assists</h3>
+                <p className="metric-figure">{metrics.placementAssists.toLocaleString()}</p>
+              </article>
+            </div>
           </div>
         </section>
 
@@ -325,8 +451,8 @@ const Homepage = () => {
             </div>
             
             <div className="faculty-grid">
-              {facultyMembers.map((faculty) => (
-                <div key={faculty.id} className="faculty-card">
+              {facultyMembers.map((faculty, index) => (
+                <div key={faculty.id} className="faculty-card" style={{ '--stagger-index': index }}>
                   <div className="faculty-photo">
                     <img src={faculty.photo} alt={faculty.name} className="faculty-img" />
                   </div>

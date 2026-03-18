@@ -1,440 +1,383 @@
-"""
-Student Performance Analysis API Routes
-Handles endpoints for individual, subject-wise, and faculty-wide performance analysis
-"""
+"""Flask routes for student performance analysis and model operations."""
 
-from flask import Blueprint, request, jsonify
-import json
+from __future__ import annotations
+
+import os
 from datetime import datetime
+from flask import Blueprint, request, jsonify
 
-from models.performance_model import StudentPerformanceModel
+from models.performance_model import (
+    StudentPerformanceAnalyzer,
+    documents_to_training_frame,
+)
 
-# Initialize Blueprint
-performance_bp = Blueprint('performance', __name__, url_prefix='/api/ml/performance')
-model = StudentPerformanceModel()
+performance_bp = Blueprint("performance", __name__, url_prefix="/api/ml/performance")
+analyzer = StudentPerformanceAnalyzer()
 
-# ==================== INDIVIDUAL STUDENT PERFORMANCE ====================
 
-@performance_bp.route('/individual/<student_id>', methods=['POST'])
-def get_individual_performance(student_id):
-    """
-    Analyze individual student performance
-    
-    Request body:
-    {
-        "cgpa": float,
-        "overallAttendance": float,
-        "semesterMarks": [...],
-        "attendance": [...],
-        "backlogs": int,
-        "studentName": string,
-        ...
-    }
-    
-    Returns:
-        Individual student performance metrics
-    """
+def _students_payload(data):
+    students = data.get("students", []) if isinstance(data, dict) else []
+    if not isinstance(students, list):
+        return []
+    return students
+
+
+@performance_bp.route("/health", methods=["GET"])
+def health():
+    return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
+
+
+@performance_bp.route("/model-info", methods=["GET"])
+def model_info():
+    return jsonify(
+        {
+            "modelType": "RandomForestClassifier",
+            "version": "2.0.0",
+            "trained": analyzer.is_trained,
+            "lastTrained": analyzer.last_trained,
+            "features": analyzer.feature_columns,
+            "accuracy": (analyzer.metrics.get("accuracy", 0) * 100) if analyzer.metrics else 0,
+            "metrics": analyzer.metrics,
+            "featureImportance": analyzer.feature_importance,
+        }
+    )
+
+
+@performance_bp.route("/train-db", methods=["POST"])
+def train_db():
     try:
-        student_data = request.get_json()
-        
-        if not student_data:
-            return jsonify({'error': 'No student data provided'}), 400
-        
-        performance = model.calculate_individual_performance(student_data)
-        
-        return jsonify({
-            'success': True,
-            'student_id': student_id,
-            'timestamp': datetime.now().isoformat(),
-            'performance': performance
-        }), 200
-        
+        data = request.get_json() or {}
+        students = _students_payload(data)
+        if not students:
+            return jsonify({"error": "No students data provided"}), 400
+
+        df = documents_to_training_frame(students)
+        result = analyzer.train_model(df)
+        return jsonify({"success": True, "message": "Model trained from database data", **result})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-# ==================== SUBJECT-WISE PERFORMANCE ====================
-
-@performance_bp.route('/subject-wise/<student_id>', methods=['POST'])
-def get_subject_wise_performance(student_id):
-    """
-    Analyze subject-wise performance for a student
-    
-    Request body:
-    {
-        "semesterMarks": [...],
-        "attendance": [...],
-        ...
-    }
-    
-    Returns:
-        Subject-wise performance breakdown for each semester
-    """
+@performance_bp.route("/train-csv", methods=["POST"])
+def train_csv():
     try:
-        student_data = request.get_json()
-        
-        if not student_data:
-            return jsonify({'error': 'No student data provided'}), 400
-        
-        subject_analysis = model.calculate_subject_wise_performance(student_data)
-        
-        return jsonify({
-            'success': True,
-            'student_id': student_id,
-            'timestamp': datetime.now().isoformat(),
-            'subject_wise_analysis': subject_analysis
-        }), 200
-        
+        data = request.get_json() or {}
+        marks_path = data.get("marks_csv")
+        attendance_path = data.get("attendance_csv")
+
+        if not marks_path or not attendance_path:
+            return jsonify({"error": "marks_csv and attendance_csv are required"}), 400
+
+        marks_df = analyzer.load_marks_csv(marks_path)
+        attendance_df = analyzer.load_attendance_csv(attendance_path)
+        merged = analyzer.merge_data(marks_df, attendance_df)
+        result = analyzer.train_model(merged)
+        return jsonify({"success": True, "message": "Model trained from CSV files", **result})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-# ==================== FACULTY STATISTICS ====================
-
-@performance_bp.route('/faculty-statistics', methods=['POST'])
-def get_faculty_statistics():
-    """
-    Calculate overall statistics for faculty dashboard
-    
-    Request body:
-    {
-        "students": [
-            {
-                "cgpa": float,
-                "overallAttendance": float,
-                "semesterMarks": [...],
-                "attendance": [...],
-                "backlogs": int,
-                "studentName": string,
-                ...
-            },
-            ...
-        ]
-    }
-    
-    Returns:
-        Comprehensive statistics for faculty dashboard
-    """
+@performance_bp.route("/predict", methods=["POST"])
+def predict_performance():
     try:
-        data = request.get_json()
-        
-        if not data or 'students' not in data:
-            return jsonify({'error': 'No students data provided'}), 400
-        
-        students_data = data['students']
-        
-        if not students_data:
-            return jsonify({'error': 'Students list is empty'}), 400
-        
-        statistics = model.calculate_faculty_statistics(students_data)
-        
-        return jsonify({
-            'success': True,
-            'timestamp': datetime.now().isoformat(),
-            'statistics': statistics
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-# ==================== CLASS/SECTION WISE ANALYSIS ====================
-
-@performance_bp.route('/class-analysis', methods=['POST'])
-def get_class_analysis():
-    """
-    Analyze performance for entire class/section
-    
-    Request body:
-    {
-        "class_name": string,
-        "students": [...]
-    }
-    
-    Returns:
-        Class-level performance analysis
-    """
-    try:
-        data = request.get_json()
-        
-        if not data or 'students' not in data:
-            return jsonify({'error': 'No students data provided'}), 400
-        
-        students_data = data['students']
-        class_name = data.get('class_name', 'Unknown')
-        
-        # Get overall statistics
-        statistics = model.calculate_faculty_statistics(students_data)
-        
-        # Add individual performance for each student
-        students_performance = []
-        for student in students_data:
-            perf = model.calculate_individual_performance(student)
-            students_performance.append({
-                'name': student.get('studentName'),
-                'roll_no': student.get('rollNo'),
-                'cgpa': student.get('cgpa'),
-                'performance': perf
-            })
-        
-        return jsonify({
-            'success': True,
-            'class_name': class_name,
-            'timestamp': datetime.now().isoformat(),
-            'overall_statistics': statistics,
-            'students_performance': students_performance
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-# ==================== AT-RISK STUDENTS ANALYSIS ====================
-
-@performance_bp.route('/at-risk-students', methods=['POST'])
-def get_at_risk_students():
-    """
-    Identify students at risk and provide intervention strategies
-    
-    Request body:
-    {
-        "students": [...]
-    }
-    
-    Returns:
-        List of at-risk students with recommendations
-    """
-    try:
-        data = request.get_json()
-        
-        if not data or 'students' not in data:
-            return jsonify({'error': 'No students data provided'}), 400
-        
-        students_data = data['students']
-        
-        at_risk_students = []
-        critical_students = []
-        
-        for student in students_data:
-            performance = model.calculate_individual_performance(student)
-            
-            if performance['risk_level'] in ['High Risk', 'Critical Risk']:
-                student_info = {
-                    'name': student.get('studentName'),
-                    'roll_no': student.get('rollNo'),
-                    'prn': student.get('prn'),
-                    'cgpa': student.get('cgpa'),
-                    'attendance': student.get('overallAttendance'),
-                    'backlogs': student.get('backlogs'),
-                    'risk_level': performance['risk_level'],
-                    'performance_score': performance['overall_performance_score'],
-                    'recommendations': performance['recommendations']
+        data = request.get_json() or {}
+        if "student" in data:
+            student_data = data["student"]
+            perf = analyzer.calculate_individual_performance(student_data)
+            return jsonify(
+                {
+                    "success": True,
+                    "prediction": {
+                        "predictedCGPA": round(float(student_data.get("cgpa", 0) or 0) * 0.7 + perf["subject_performance_score"] / 20, 2),
+                        "placementProbability": perf["placement_probability"],
+                        "riskCategory": perf["risk_level"].replace(" Risk", ""),
+                        "recommendations": perf["recommendations"],
+                        "confidence": 0.82,
+                    },
                 }
-                
-                if performance['risk_level'] == 'Critical Risk':
-                    critical_students.append(student_info)
+            )
+
+        # Feature based prediction
+        pred = analyzer.predict_label(data)
+        return jsonify({"success": True, **pred})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@performance_bp.route("/search-student", methods=["POST"])
+def search_student():
+    try:
+        data = request.get_json() or {}
+        query = data.get("query", "")
+        students = _students_payload(data)
+        matches = analyzer.search_students(students, query)
+        return jsonify({"success": True, "count": len(matches), "students": matches})
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@performance_bp.route("/individual/<student_id>", methods=["POST"])
+def get_individual_performance(student_id):
+    try:
+        student_data = request.get_json() or {}
+        if not student_data:
+            return jsonify({"error": "No student data provided"}), 400
+
+        performance = analyzer.calculate_individual_performance(student_data)
+        trends = analyzer.performance_trends_over_time(student_data)
+        radar_path = analyzer.generate_radar_chart(student_data)
+
+        return jsonify(
+            {
+                "success": True,
+                "student_id": student_id,
+                "timestamp": datetime.now().isoformat(),
+                "performance": performance,
+                "trends": trends,
+                "radar_chart": radar_path,
+            }
+        ), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@performance_bp.route("/subject-wise/<student_id>", methods=["POST"])
+def get_subject_wise_performance(student_id):
+    try:
+        student_data = request.get_json() or {}
+        if not student_data:
+            return jsonify({"error": "No student data provided"}), 400
+
+        subject_analysis = analyzer.calculate_subject_wise_performance(student_data)
+        return jsonify(
+            {
+                "success": True,
+                "student_id": student_id,
+                "timestamp": datetime.now().isoformat(),
+                "subject_wise_analysis": subject_analysis,
+            }
+        ), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@performance_bp.route("/faculty-statistics", methods=["POST"])
+def get_faculty_statistics():
+    try:
+        data = request.get_json() or {}
+        students = _students_payload(data)
+        if not students:
+            return jsonify({"error": "No students data provided"}), 400
+
+        stats = analyzer.calculate_faculty_statistics(students)
+        dist_plot = analyzer.class_distribution_plot(students)
+        scatter_plot = analyzer.attendance_marks_scatter(students)
+
+        return jsonify(
+            {
+                "success": True,
+                "timestamp": datetime.now().isoformat(),
+                "statistics": stats,
+                "plots": {
+                    "distribution": dist_plot,
+                    "attendance_vs_marks": scatter_plot,
+                },
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@performance_bp.route("/at-risk-students", methods=["POST"])
+def get_at_risk_students():
+    try:
+        data = request.get_json() or {}
+        students = _students_payload(data)
+        if not students:
+            return jsonify({"error": "No students data provided"}), 400
+
+        high = []
+        critical = []
+        for s in students:
+            perf = analyzer.calculate_individual_performance(s)
+            if perf["risk_level"] in ["High Risk", "Critical Risk"]:
+                item = {
+                    "name": s.get("studentName"),
+                    "roll_no": s.get("rollNo"),
+                    "prn": s.get("prn"),
+                    "cgpa": s.get("cgpa"),
+                    "attendance": s.get("overallAttendance"),
+                    "backlogs": s.get("backlogs"),
+                    "risk_level": perf["risk_level"],
+                    "performance_score": perf["overall_performance_score"],
+                    "recommendations": perf["recommendations"],
+                }
+                if perf["risk_level"] == "Critical Risk":
+                    critical.append(item)
                 else:
-                    at_risk_students.append(student_info)
-        
-        return jsonify({
-            'success': True,
-            'timestamp': datetime.now().isoformat(),
-            'total_at_risk': len(at_risk_students) + len(critical_students),
-            'critical_risk_students': critical_students,
-            'high_risk_students': at_risk_students
-        }), 200
-        
+                    high.append(item)
+
+        return jsonify(
+            {
+                "success": True,
+                "timestamp": datetime.now().isoformat(),
+                "total_at_risk": len(high) + len(critical),
+                "critical_risk_students": critical,
+                "high_risk_students": high,
+            }
+        )
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-# ==================== SUBJECT PERFORMANCE ANALYSIS ====================
-
-@performance_bp.route('/subject-analysis', methods=['POST'])
+@performance_bp.route("/subject-analysis", methods=["POST"])
 def get_subject_analysis():
-    """
-    Analyze performance for a specific subject across all students
-    
-    Request body:
-    {
-        "subject_name": string,
-        "students": [...]
-    }
-    
-    Returns:
-        Subject-wise performance analysis
-    """
     try:
-        data = request.get_json()
-        
-        if not data or 'students' not in data:
-            return jsonify({'error': 'No students data provided'}), 400
-        
-        students_data = data['students']
-        subject_name = data.get('subject_name', 'All Subjects')
-        
-        subject_performances = []
-        total_marks = []
-        grade_distribution = {}
-        
-        for student in students_data:
-            semester_marks = student.get('semesterMarks', [])
-            
-            for semester in semester_marks:
-                for subject in semester.get('subjects', []):
-                    if subject_name == 'All Subjects' or subject.get('subjectName') == subject_name:
-                        marks = subject.get('totalMarks', 0)
-                        grade = subject.get('grade', 'N/A')
-                        
-                        total_marks.append(marks)
-                        grade_distribution[grade] = grade_distribution.get(grade, 0) + 1
-                        
-                        subject_performances.append({
-                            'student_name': student.get('studentName'),
-                            'marks': marks,
-                            'grade': grade,
-                            'subject': subject.get('subjectName')
-                        })
-        
-        avg_marks = sum(total_marks) / len(total_marks) if total_marks else 0
-        max_marks = max(total_marks) if total_marks else 0
-        min_marks = min(total_marks) if total_marks else 0
-        
-        return jsonify({
-            'success': True,
-            'subject_name': subject_name,
-            'timestamp': datetime.now().isoformat(),
-            'statistics': {
-                'total_students': len(subject_performances),
-                'average_marks': round(avg_marks, 2),
-                'highest_marks': max_marks,
-                'lowest_marks': min_marks,
-                'grade_distribution': grade_distribution
-            },
-            'student_performances': subject_performances
-        }), 200
-        
+        data = request.get_json() or {}
+        students = _students_payload(data)
+        subject_name = data.get("subject_name", "All Subjects")
+        if not students:
+            return jsonify({"error": "No students data provided"}), 400
+
+        records = []
+        marks = []
+        grades = {}
+        for s in students:
+            for sem in s.get("semesterMarks", []) or []:
+                for sub in sem.get("subjects", []) or []:
+                    sub_name = sub.get("subjectName", "Unknown")
+                    if subject_name != "All Subjects" and sub_name != subject_name:
+                        continue
+                    m = float(sub.get("totalMarks", 0) or 0)
+                    g = sub.get("grade", "N/A")
+                    records.append(
+                        {
+                            "student_name": s.get("studentName"),
+                            "prn": s.get("prn"),
+                            "subject": sub_name,
+                            "marks": m,
+                            "grade": g,
+                        }
+                    )
+                    marks.append(m)
+                    grades[g] = grades.get(g, 0) + 1
+
+        avg_marks = round(sum(marks) / len(marks), 2) if marks else 0
+        return jsonify(
+            {
+                "success": True,
+                "subject_name": subject_name,
+                "timestamp": datetime.now().isoformat(),
+                "statistics": {
+                    "total_students": len(records),
+                    "average_marks": avg_marks,
+                    "highest_marks": max(marks) if marks else 0,
+                    "lowest_marks": min(marks) if marks else 0,
+                    "grade_distribution": grades,
+                },
+                "student_performances": records,
+                "subject_wise_attendance": analyzer.subject_wise_attendance_analysis(students),
+            }
+        )
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-# ==================== COMPARATIVE ANALYSIS ====================
-
-@performance_bp.route('/compare-students', methods=['POST'])
+@performance_bp.route("/compare-students", methods=["POST"])
 def compare_students():
-    """
-    Compare performance of multiple students
-    
-    Request body:
-    {
-        "student_ids": [list of student data objects]
-    }
-    
-    Returns:
-        Comparative analysis of selected students
-    """
     try:
-        data = request.get_json()
-        
-        if not data or 'students' not in data:
-            return jsonify({'error': 'No students data provided'}), 400
-        
-        students_data = data['students']
-        
+        data = request.get_json() or {}
+        students = _students_payload(data)
+        if not students:
+            return jsonify({"error": "No students data provided"}), 400
+
         comparison = []
-        
-        for student in students_data:
-            performance = model.calculate_individual_performance(student)
-            comparison.append({
-                'name': student.get('studentName'),
-                'roll_no': student.get('rollNo'),
-                'cgpa': student.get('cgpa'),
-                'attendance': student.get('overallAttendance'),
-                'performance_score': performance['overall_performance_score'],
-                'performance_category': performance['performance_category'],
-                'risk_level': performance['risk_level']
-            })
-        
-        # Sort by performance score
-        comparison = sorted(comparison, key=lambda x: x['performance_score'], reverse=True)
-        
-        return jsonify({
-            'success': True,
-            'timestamp': datetime.now().isoformat(),
-            'comparison_count': len(comparison),
-            'students_comparison': comparison
-        }), 200
-        
+        for s in students:
+            perf = analyzer.calculate_individual_performance(s)
+            comparison.append(
+                {
+                    "name": s.get("studentName"),
+                    "roll_no": s.get("rollNo"),
+                    "cgpa": s.get("cgpa"),
+                    "attendance": s.get("overallAttendance"),
+                    "performance_score": perf["overall_performance_score"],
+                    "performance_category": perf["performance_category"],
+                    "risk_level": perf["risk_level"],
+                }
+            )
+        comparison = sorted(comparison, key=lambda x: x["performance_score"], reverse=True)
+
+        return jsonify(
+            {
+                "success": True,
+                "timestamp": datetime.now().isoformat(),
+                "comparison_count": len(comparison),
+                "students_comparison": comparison,
+            }
+        )
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-# ==================== IMPROVEMENT TRACKING ====================
-
-@performance_bp.route('/improvement-analysis/<student_id>', methods=['POST'])
+@performance_bp.route("/improvement-analysis/<student_id>", methods=["POST"])
 def get_improvement_analysis(student_id):
-    """
-    Analyze semester-to-semester improvement
-    
-    Request body:
-    {
-        "semesterMarks": [...]
-    }
-    
-    Returns:
-        Improvement trends and analysis
-    """
     try:
-        student_data = request.get_json()
-        
-        if not student_data or 'semesterMarks' not in student_data:
-            return jsonify({'error': 'No semester marks data provided'}), 400
-        
-        semester_marks = student_data['semesterMarks']
-        
-        if len(semester_marks) < 2:
-            return jsonify({'error': 'Need at least 2 semesters for improvement analysis'}), 400
-        
-        improvement_data = []
-        
-        for i, semester in enumerate(semester_marks):
-            sgpa = semester.get('sgpa', 0)
-            year = semester.get('year')
-            sem = semester.get('semester')
-            
-            improvement_item = {
-                'semester_number': i + 1,
-                'year': year,
-                'semester': sem,
-                'sgpa': sgpa
+        student_data = request.get_json() or {}
+        if not student_data:
+            return jsonify({"error": "No student data provided"}), 400
+
+        trend = analyzer.performance_trends_over_time(student_data)
+        if len(trend) < 1:
+            return jsonify({"error": "No semester trend data available"}), 400
+
+        deltas = []
+        for i in range(1, len(trend)):
+            deltas.append(trend[i]["sgpa"] - trend[i - 1]["sgpa"])
+
+        trend_type = "stable"
+        if deltas and sum(deltas) > 0:
+            trend_type = "improving"
+        elif deltas and sum(deltas) < 0:
+            trend_type = "declining"
+
+        return jsonify(
+            {
+                "success": True,
+                "student_id": student_id,
+                "timestamp": datetime.now().isoformat(),
+                "trend_type": trend_type,
+                "trend_data": trend,
+                "average_change": round(sum(deltas) / len(deltas), 3) if deltas else 0,
             }
-            
-            if i > 0:
-                prev_sgpa = semester_marks[i-1].get('sgpa', 0)
-                change = sgpa - prev_sgpa
-                improvement_item['change_from_previous'] = round(change, 2)
-                improvement_item['change_percentage'] = round((change / prev_sgpa * 100) if prev_sgpa > 0 else 0, 2)
-            
-            improvement_data.append(improvement_item)
-        
-        # Calculate overall trend
-        first_sgpa = semester_marks[0].get('sgpa', 0)
-        last_sgpa = semester_marks[-1].get('sgpa', 0)
-        overall_trend = last_sgpa - first_sgpa
-        trend_direction = 'Improving' if overall_trend > 0 else 'Declining' if overall_trend < 0 else 'Stable'
-        
-        return jsonify({
-            'success': True,
-            'student_id': student_id,
-            'timestamp': datetime.now().isoformat(),
-            'semester_progression': improvement_data,
-            'overall_trend': {
-                'direction': trend_direction,
-                'total_change': round(overall_trend, 2),
-                'first_sgpa': round(first_sgpa, 2),
-                'last_sgpa': round(last_sgpa, 2)
-            }
-        }), 200
-        
+        )
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
+
+
+@performance_bp.route("/save-model", methods=["POST"])
+def save_model():
+    try:
+        data = request.get_json() or {}
+        path = data.get("path", "models/performance_model.joblib")
+        result = analyzer.save_model(path)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@performance_bp.route("/load-model", methods=["POST"])
+def load_model():
+    try:
+        data = request.get_json() or {}
+        path = data.get("path", "models/performance_model.joblib")
+        result = analyzer.load_model(path)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@performance_bp.route("/menu-options", methods=["GET"])
+def menu_options():
+    return jsonify({"options": analyzer.menu_options()})

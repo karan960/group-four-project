@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import NotificationCenter from '../components/NotificationCenter';
+import TimetableBoard from '../components/TimetableBoard';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -103,6 +104,7 @@ const StudentDashboard = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [studentData, setStudentData] = useState(null);
   const [performance, setPerformance] = useState(null);
+  const [fullAnalysis, setFullAnalysis] = useState(null);
   const [attendance, setAttendance] = useState(null);
   const [marks, setMarks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -116,6 +118,9 @@ const StudentDashboard = () => {
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [assignmentForms, setAssignmentForms] = useState({});
   const [assignmentStatus, setAssignmentStatus] = useState({});
+  const [studentTimetable, setStudentTimetable] = useState(null);
+  const [studentTimetableEntries, setStudentTimetableEntries] = useState([]);
+  const [studentTimetableLoading, setStudentTimetableLoading] = useState(false);
   
   // Settings Modal States
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -132,7 +137,7 @@ const StudentDashboard = () => {
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/notifications/unread/count', {
+        const response = await axios.get(`${API_BASE_URL}/api/notifications/unread/count`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         setUnreadCount(response.data.unreadCount || 0);
@@ -157,7 +162,35 @@ const StudentDashboard = () => {
     if (activeTab === 'Assignments') {
       fetchAssignments();
     }
+    if (activeTab === 'Schedule') {
+      fetchStudentTimetable();
+    }
   }, [activeTab]);
+
+  const fetchStudentTimetable = async () => {
+    try {
+      setStudentTimetableLoading(true);
+      const token = localStorage.getItem('token');
+      const params = {};
+      if (studentData?.batch) {
+        params.batch = studentData.batch;
+      }
+
+      const response = await axios.get(`${API_BASE_URL}/api/student/timetable`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params
+      });
+
+      setStudentTimetable(response.data.timetable || null);
+      setStudentTimetableEntries(response.data.entries || []);
+    } catch (error) {
+      console.error('Error fetching student timetable:', error);
+      setStudentTimetable(null);
+      setStudentTimetableEntries([]);
+    } finally {
+      setStudentTimetableLoading(false);
+    }
+  };
 
   const handleOpenSettings = () => {
     // Initialize profile change form with current data
@@ -233,7 +266,7 @@ const StudentDashboard = () => {
       const token = localStorage.getItem('token');
       
       const response = await axios.post(
-        'http://localhost:5000/api/change-requests/password',
+        `${API_BASE_URL}/api/change-requests/password`,
         {
           studentPRN: user.referenceId,
           requestedBy: user.username,
@@ -292,19 +325,58 @@ const StudentDashboard = () => {
           setMarks(student.semesterMarks);
         }
         
-        // Use actual student data with ML predictions
+        // Fetch ML analysis from backend by PRN
+        let mlPayload = null;
+        try {
+          const mlResponse = await axios.get(
+            `${API_BASE_URL}/api/ml-analysis/student-prn/${student.prn}`,
+            {
+              headers: { 'Authorization': `Bearer ${token}` }
+            }
+          );
+          mlPayload = mlResponse.data;
+        } catch (mlError) {
+          console.error('ML analysis fetch failed:', mlError.message);
+        }
+
+        // Fetch full analysis payload for direct dashboard visibility
+        try {
+          if (student._id) {
+            const fullAnalysisResponse = await axios.get(
+              `${API_BASE_URL}/api/ml-analysis/student/${student._id}/full-analysis`,
+              {
+                headers: { 'Authorization': `Bearer ${token}` }
+              }
+            );
+            setFullAnalysis(fullAnalysisResponse.data || null);
+          }
+        } catch (fullAnalysisError) {
+          console.error('Full analysis fetch failed:', fullAnalysisError.message);
+          setFullAnalysis(mlPayload || null);
+        }
+
+        const performanceDetails = mlPayload?.individual?.performance || null;
+        const subjectAnalysis = mlPayload?.subjects?.subject_wise_analysis || {};
+
+        const flattenedSubjects = Object.values(subjectAnalysis || {})
+          .flat()
+          .map((sub) => ({
+            subject: sub.subject_name || 'Subject',
+            prediction: sub.performance_rating || 'Average',
+            confidence: Number(sub.subject_score || 0)
+          }));
+
         setPerformance({
-          predictions: [
-            { subject: 'Data Structures', prediction: 'Excellent', confidence: 87 },
-            { subject: 'Algorithms', prediction: 'Good', confidence: 78 },
-            { subject: 'Database Systems', prediction: 'Excellent', confidence: 92 },
-            { subject: 'Operating Systems', prediction: 'Average', confidence: 65 },
-            { subject: 'Computer Networks', prediction: 'Good', confidence: 82 },
-            { subject: 'Software Engineering', prediction: 'Excellent', confidence: 88 }
-          ],
-          overall: 'Good',
+          predictions: flattenedSubjects.length > 0
+            ? flattenedSubjects
+            : [
+                { subject: 'Academic Performance', prediction: performanceDetails?.performance_category || 'Average', confidence: Number(performanceDetails?.overall_performance_score || 50) }
+              ],
+          overall: (performanceDetails?.performance_category || 'Average'),
           cgpa: student.cgpa || summary.cgpa || 0,
-          attendance: summary.attendance || 0
+          attendance: summary.attendance || 0,
+          riskLevel: performanceDetails?.risk_level || 'Medium Risk',
+          recommendations: performanceDetails?.recommendations || []
         });
 
         // Use actual attendance data if available
@@ -443,6 +515,8 @@ const StudentDashboard = () => {
       cgpa: 8.5,
       attendance: 85
     });
+
+    setFullAnalysis(null);
 
     setAttendance({
       overall: 85,
@@ -640,18 +714,6 @@ const StudentDashboard = () => {
           ><span className="nav-icon"><FaFileAlt /></span><span className="nav-label">Results</span></a>
         </nav>
         
-        <div className="sidebar-footer">
-          <div className="sidebar-stats">
-            <div className="stat">
-              <span className="stat-number">6</span>
-              <span className="stat-label">Subjects</span>
-            </div>
-            <div className="stat">
-              <span className="stat-number">A</span>
-              <span className="stat-label">Grade</span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Main Content */}
@@ -785,7 +847,21 @@ const StudentDashboard = () => {
                       </span>
                     </h3>
                     <p>Based on your attendance, marks, and study patterns</p>
+                    {performance?.riskLevel && (
+                      <p><strong>Risk Level:</strong> {performance.riskLevel}</p>
+                    )}
                   </div>
+
+                  {Array.isArray(performance?.recommendations) && performance.recommendations.length > 0 && (
+                    <div style={{ marginBottom: '1rem' }}>
+                      <h4>Recommendations</h4>
+                      <ul>
+                        {performance.recommendations.slice(0, 4).map((rec, idx) => (
+                          <li key={idx}>{rec}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   
                   <div className="predictions-grid">
                     {performance?.predictions.map((item, index) => (
@@ -803,6 +879,60 @@ const StudentDashboard = () => {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              {/* Attendance Details */}
+              <div className="card">
+                <div className="card-header">
+                  <h2 className="card-title"><FaBullseye /> Full Analysis Overview</h2>
+                </div>
+                <div className="card-body">
+                  {fullAnalysis ? (
+                    <>
+                      <div className="stats-grid" style={{ marginBottom: '1rem' }}>
+                        <div className="stat-card">
+                          <div className="stat-icon"><FaChartLine /></div>
+                          <div className="stat-info">
+                            <h3>{fullAnalysis?.individual?.performance?.overall_performance_score ?? 'N/A'}</h3>
+                            <p>Overall Score</p>
+                          </div>
+                        </div>
+                        <div className="stat-card">
+                          <div className="stat-icon"><FaClipboard /></div>
+                          <div className="stat-info">
+                            <h3>{fullAnalysis?.individual?.performance?.performance_category || 'N/A'}</h3>
+                            <p>Category</p>
+                          </div>
+                        </div>
+                        <div className="stat-card">
+                          <div className="stat-icon"><FaLock /></div>
+                          <div className="stat-info">
+                            <h3>{fullAnalysis?.individual?.performance?.risk_level || 'N/A'}</h3>
+                            <p>Risk Level</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {Array.isArray(fullAnalysis?.individual?.performance?.recommendations) && fullAnalysis.individual.performance.recommendations.length > 0 && (
+                        <div style={{ marginBottom: '1rem' }}>
+                          <h4>Personalized Recommendations</h4>
+                          <ul>
+                            {fullAnalysis.individual.performance.recommendations.slice(0, 6).map((rec, idx) => (
+                              <li key={idx}>{rec}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      <details>
+                        <summary>View Complete Analysis JSON</summary>
+                        <pre>{JSON.stringify(fullAnalysis, null, 2)}</pre>
+                      </details>
+                    </>
+                  ) : (
+                    <p style={{ color: 'var(--text-secondary)' }}>Detailed analysis is not available yet. Please try again in a moment.</p>
+                  )}
                 </div>
               </div>
 
@@ -883,10 +1013,6 @@ const StudentDashboard = () => {
                   <h2 className="card-title">{activeTab}</h2>
                 </div>
                 <div className="card-body">
-                  <p style={{ color: 'var(--muted)', marginBottom: '1rem' }}>
-                    This is a quick placeholder for the <strong>{activeTab}</strong> tab. You can wire this to real routes or components later.
-                  </p>
-
                   {/* Example lightweight content for a few tabs */}
                   {activeTab === 'Courses' && (
                     <div>
@@ -1000,8 +1126,20 @@ const StudentDashboard = () => {
 
                   {activeTab === 'Schedule' && (
                     <div>
-                      <p className="confidence-label">Mon: Data Structures - 10:00 AM</p>
-                      <p className="confidence-label">Tue: Algorithms - 2:00 PM</p>
+                      {studentTimetableLoading ? (
+                        <div style={{ textAlign: 'center', padding: '1rem' }}>
+                          <div className="spinner"></div>
+                        </div>
+                      ) : (
+                        <TimetableBoard
+                          timetable={studentTimetable}
+                          entries={studentTimetableEntries}
+                          title="My Weekly Schedule"
+                          subtitle="Filtered by your class/division/batch"
+                          allowPrint
+                          allowExport
+                        />
+                      )}
                     </div>
                   )}
 
@@ -1370,7 +1508,7 @@ const StudentDashboard = () => {
             // Refresh unread count after closing
             const fetchUnreadCount = async () => {
               try {
-                const response = await axios.get('http://localhost:5000/api/notifications/unread/count', {
+                const response = await axios.get(`${API_BASE_URL}/api/notifications/unread/count`, {
                   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                 });
                 setUnreadCount(response.data.unreadCount || 0);
@@ -1384,7 +1522,7 @@ const StudentDashboard = () => {
             // Refresh unread count when a notification is marked as read
             const fetchUnreadCount = async () => {
               try {
-                const response = await axios.get('http://localhost:5000/api/notifications/unread/count', {
+                const response = await axios.get(`${API_BASE_URL}/api/notifications/unread/count`, {
                   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                 });
                 setUnreadCount(response.data.unreadCount || 0);

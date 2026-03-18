@@ -1,4 +1,6 @@
 
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;500;600;700;800&display=swap');
+
 * {
   margin: 0;
   padding: 0;
@@ -6,9 +8,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-body, 'Sora', 'Segoe UI', sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg);
@@ -18,7 +18,7 @@ body {
 }
 
 code {
-  font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-data, 'JetBrains Mono', 'Consolas', monospace);
   font-size: 0.9em;
   background: var(--table-header);
   padding: 2px 6px;
@@ -77,4 +77,28 @@ code {
 
 .dark ::-moz-selection {
   background: var(--primary-700);
-  color: var(--on-primary);}
+  color: var(--on-primary);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading, 'Sora', 'Segoe UI', sans-serif);
+  letter-spacing: 0.01em;
+}
+
+.metric-value,
+.metric-number,
+.metric-figure,
+.stat-value,
+.stat-number,
+.analytics-value,
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-data, 'JetBrains Mono', 'Consolas', monospace);
+}

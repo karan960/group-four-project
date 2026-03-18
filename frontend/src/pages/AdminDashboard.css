@@ -2,7 +2,7 @@
   display: flex;
   min-height: 100vh;
   background: var(--bg);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-body, 'Sora', 'Segoe UI', sans-serif);
 }
 
 /* Sidebar Styles */
@@ -659,12 +659,26 @@
   box-shadow: 0 8px 25px rgba(0,0,0,0.08);
 }
 
+.quick-action-btn.quick-action-danger {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.quick-action-btn.quick-action-danger:hover {
+  border-color: var(--danger);
+  box-shadow: 0 10px 25px rgba(220, 53, 69, 0.18);
+}
+
 .action-icon {
   font-size: 2rem;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--primary);
+}
+
+.action-icon.danger {
+  color: var(--danger);
 }
 
 .action-icon svg {
@@ -2887,5 +2901,84 @@
 @media (max-width: 1200px) {
   .data-stats {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 992px) {
+  .admin-dashboard .main-header {
+    padding: 1rem 1.25rem;
+  }
+
+  .admin-dashboard .page-content {
+    margin: 1rem;
+    padding: 1rem;
+  }
+
+  .admin-dashboard .header-actions {
+    flex-wrap: wrap;
+  }
+
+  .admin-dashboard .stats-grid,
+  .admin-dashboard .data-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-dashboard .sidebar {
+    width: 84px !important;
+  }
+
+  .admin-dashboard .sidebar-header {
+    padding: 1rem 0.6rem;
+  }
+
+  .admin-dashboard .sidebar-toggle {
+    margin: 0 auto 0.75rem;
+  }
+
+  .admin-dashboard .logo-text,
+  .admin-dashboard .nav-label,
+  .admin-dashboard .sidebar-footer {
+    display: none !important;
+  }
+
+  .admin-dashboard .sidebar-nav .nav-item,
+  .admin-dashboard .nav-item {
+    justify-content: center;
+    grid-template-columns: 1fr;
+    padding: 0.85rem 0.5rem;
+    border-left: none;
+  }
+
+  .admin-dashboard .nav-icon {
+    margin-right: 0 !important;
+  }
+
+  .admin-dashboard .main-content {
+    margin-left: 84px !important;
+  }
+
+  .admin-dashboard .main-header {
+    padding: 0.85rem 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .admin-dashboard .header-right,
+  .admin-dashboard .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .admin-dashboard .page-content {
+    margin: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .admin-dashboard .data-table {
+    font-size: 0.84rem;
   }
 }

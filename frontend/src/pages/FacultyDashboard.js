@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import NotificationCenter from '../components/NotificationCenter';
+import TimetableBoard from '../components/TimetableBoard';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -23,8 +24,10 @@ import {
   FaCalendar, FaHome, FaCheckCircle, FaClock, FaFileAlt, FaLock
 } from 'react-icons/fa';
 import './FacultyDashboard.css';
+import './StudentDashboard.css';
 
 const localStorage = window.sessionStorage;
+const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
 
 // Register ChartJS components
 ChartJS.register(
@@ -141,6 +144,39 @@ const FacultyDashboard = () => {
     confirmPassword: ''
   });
   const [submitStatus, setSubmitStatus] = useState('');
+  const [facultyTimetable, setFacultyTimetable] = useState(null);
+  const [facultyTimetableEntries, setFacultyTimetableEntries] = useState([]);
+  const [facultyTimetableLoading, setFacultyTimetableLoading] = useState(false);
+  const [facultySubjectAnalysis, setFacultySubjectAnalysis] = useState([]);
+  const [subjectAnalysisLoading, setSubjectAnalysisLoading] = useState(false);
+  const [subjectAnalysisError, setSubjectAnalysisError] = useState('');
+  const [facultyStudentsAnalysis, setFacultyStudentsAnalysis] = useState([]);
+  const [studentsAnalysisLoading, setStudentsAnalysisLoading] = useState(false);
+  const [studentsAnalysisError, setStudentsAnalysisError] = useState('');
+  const [selectedStudentAnalysis, setSelectedStudentAnalysis] = useState(null);
+  const [attendanceForm, setAttendanceForm] = useState({
+    prn: '',
+    month: 'Overall',
+    year: new Date().getFullYear().toString(),
+    subjectName: '',
+    type: 'theory',
+    totalClasses: '',
+    attendedClasses: ''
+  });
+  const [marksForm, setMarksForm] = useState({
+    prn: '',
+    year: 'First',
+    semester: '1',
+    academicYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+    subjectName: '',
+    subjectCode: '',
+    internalMarks: '',
+    externalMarks: '',
+    credits: '4',
+    grade: ''
+  });
+  const [attendanceStatus, setAttendanceStatus] = useState('');
+  const [marksStatus, setMarksStatus] = useState('');
 
   const handleViewProfile = () => {
     setShowProfileDetails(true);
@@ -168,7 +204,7 @@ const FacultyDashboard = () => {
       const token = localStorage.getItem('token');
 
       await axios.post(
-        'http://localhost:5000/api/change-requests/profile',
+        `${API_BASE_URL}/api/change-requests/profile`,
         {
           facultyId: user.referenceId,
           requestedBy: user.username,
@@ -216,7 +252,7 @@ const FacultyDashboard = () => {
       const token = localStorage.getItem('token');
 
       await axios.post(
-        'http://localhost:5000/api/change-requests/password',
+        `${API_BASE_URL}/api/change-requests/password`,
         {
           facultyId: user.referenceId,
           requestedBy: user.username,
@@ -249,7 +285,7 @@ const FacultyDashboard = () => {
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/notifications/unread/count', {
+        const response = await axios.get(`${API_BASE_URL}/api/notifications/unread/count`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         setUnreadCount(response.data.unreadCount || 0);
@@ -268,6 +304,12 @@ const FacultyDashboard = () => {
   }, []);
 
   useEffect(() => {
+    if (activeTab === 'Subjects') {
+      fetchFacultySubjectAnalysis();
+    }
+    if (activeTab === 'Students') {
+      fetchFacultyStudentsAnalysis();
+    }
     if (activeTab === 'Courses') {
       fetchCourses();
     }
@@ -275,7 +317,92 @@ const FacultyDashboard = () => {
       fetchCourses();
       fetchAssignments();
     }
-  }, [activeTab]);
+    if (activeTab === 'Timetable') {
+      fetchFacultyTimetable();
+    }
+  }, [activeTab, facultyData?._id]);
+
+  const fetchFacultySubjectAnalysis = async () => {
+    try {
+      const facultyIdentifier = facultyData?._id || facultyData?.facultyId || user?.referenceId;
+      if (!facultyIdentifier) return;
+      setSubjectAnalysisLoading(true);
+      setSubjectAnalysisError('');
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/ml-analysis/faculty/${facultyIdentifier}/subject-analysis`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setFacultySubjectAnalysis(response.data?.subjects || []);
+    } catch (error) {
+      console.error('Error fetching faculty subject analysis:', error);
+      setSubjectAnalysisError(error.response?.data?.error || error.message);
+      setFacultySubjectAnalysis([]);
+    } finally {
+      setSubjectAnalysisLoading(false);
+    }
+  };
+
+  const fetchFacultyStudentsAnalysis = async () => {
+    try {
+      const facultyIdentifier = facultyData?._id || facultyData?.facultyId || user?.referenceId;
+      if (!facultyIdentifier) return;
+      setStudentsAnalysisLoading(true);
+      setStudentsAnalysisError('');
+      setSelectedStudentAnalysis(null);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/ml-analysis/faculty/${facultyIdentifier}/students-analysis`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setFacultyStudentsAnalysis(response.data?.students || []);
+    } catch (error) {
+      console.error('Error fetching faculty students analysis list:', error);
+      setStudentsAnalysisError(error.response?.data?.error || error.message);
+      setFacultyStudentsAnalysis([]);
+    } finally {
+      setStudentsAnalysisLoading(false);
+    }
+  };
+
+  const fetchFullStudentAnalysis = async (studentId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/ml-analysis/student/${studentId}/full-analysis`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSelectedStudentAnalysis(response.data || null);
+    } catch (error) {
+      console.error('Error fetching full student analysis:', error);
+      setSelectedStudentAnalysis({
+        error: error.response?.data?.error || error.message
+      });
+    }
+  };
+
+  const fetchFacultyTimetable = async () => {
+    try {
+      setFacultyTimetableLoading(true);
+      const token = localStorage.getItem('token');
+      const staffId = (facultyData?.facultyId || user?.referenceId || '').toUpperCase();
+      if (!staffId) {
+        setFacultyTimetable(null);
+        setFacultyTimetableEntries([]);
+        return;
+      }
+
+      const response = await axios.get(`${API_BASE_URL}/api/faculty/timetable/${staffId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setFacultyTimetable(response.data.timetable || null);
+      setFacultyTimetableEntries(response.data.entries || []);
+    } catch (error) {
+      console.error('Error fetching faculty timetable:', error);
+      setFacultyTimetable(null);
+      setFacultyTimetableEntries([]);
+    } finally {
+      setFacultyTimetableLoading(false);
+    }
+  };
 
   const fetchFacultyData = async () => {
     try {
@@ -283,17 +410,19 @@ const FacultyDashboard = () => {
       const token = localStorage.getItem('token');
       
       // Fetch faculty profile
-      const facultyResponse = await axios.get('http://localhost:5000/api/faculty', {
+      const facultyResponse = await axios.get(`${API_BASE_URL}/api/faculty`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
       // Find current faculty
       const currentFaculty = facultyResponse.data.find(
-        faculty => faculty.facultyId === user.referenceId
+        faculty => (faculty.facultyId || '').toUpperCase() === (user.referenceId || '').toUpperCase()
       );
 
       if (currentFaculty) {
         setFacultyData(currentFaculty);
+      } else {
+        setMockData();
       }
 
       // Mock teaching data
@@ -345,7 +474,7 @@ const FacultyDashboard = () => {
     try {
       setCoursesLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/courses', {
+      const response = await axios.get(`${API_BASE_URL}/api/courses`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setCourses(response.data.courses || []);
@@ -360,7 +489,7 @@ const FacultyDashboard = () => {
     try {
       setAssignmentsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/assignments', {
+      const response = await axios.get(`${API_BASE_URL}/api/assignments`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setAssignments(response.data.assignments || []);
@@ -390,7 +519,7 @@ const FacultyDashboard = () => {
         formData.append('file', courseForm.file);
       }
 
-      const response = await axios.post('http://localhost:5000/api/courses', formData, {
+      const response = await axios.post(`${API_BASE_URL}/api/courses`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -420,7 +549,7 @@ const FacultyDashboard = () => {
         formData.append('file', assignmentForm.file);
       }
 
-      const response = await axios.post('http://localhost:5000/api/assignments', formData, {
+      const response = await axios.post(`${API_BASE_URL}/api/assignments`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -437,12 +566,133 @@ const FacultyDashboard = () => {
     try {
       setSelectedAssignmentId(assignmentId);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:5000/api/assignments/${assignmentId}/submissions`, {
+      const response = await axios.get(`${API_BASE_URL}/api/assignments/${assignmentId}/submissions`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setSubmissions(response.data.submissions || []);
     } catch (error) {
       console.error('Error fetching submissions:', error);
+    }
+  };
+
+  const deriveGradeFromMarks = (internal, external) => {
+    const total = Number(internal || 0) + Number(external || 0);
+    if (total >= 90) return 'O';
+    if (total >= 80) return 'A+';
+    if (total >= 70) return 'A';
+    if (total >= 60) return 'B+';
+    if (total >= 50) return 'B';
+    if (total >= 40) return 'C';
+    return 'F';
+  };
+
+  const handleSubmitAttendance = async () => {
+    try {
+      if (!attendanceForm.prn || !attendanceForm.subjectName || !attendanceForm.totalClasses || !attendanceForm.attendedClasses) {
+        setAttendanceStatus('[ERR] PRN, subject, total and attended classes are required.');
+        return;
+      }
+
+      const token = localStorage.getItem('token');
+      const studentRes = await axios.get(`${API_BASE_URL}/api/students/${attendanceForm.prn}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const student = studentRes.data?.student;
+      if (!student) {
+        setAttendanceStatus('[ERR] Student not found.');
+        return;
+      }
+
+      const targetMonth = attendanceForm.month || 'Overall';
+      const targetYear = Number(attendanceForm.year || new Date().getFullYear());
+      const existingAttendance = Array.isArray(student.attendance) ? student.attendance : [];
+      const monthEntry = existingAttendance.find(
+        (a) => a.month === targetMonth && Number(a.year) === targetYear
+      );
+
+      const nextSubject = {
+        subjectName: attendanceForm.subjectName,
+        type: attendanceForm.type || 'theory',
+        totalClasses: Number(attendanceForm.totalClasses),
+        attendedClasses: Number(attendanceForm.attendedClasses)
+      };
+
+      const existingSubjects = Array.isArray(monthEntry?.subjects) ? monthEntry.subjects : [];
+      const withoutSameSubject = existingSubjects.filter(
+        (s) => !(
+          String(s.subjectName || '').toLowerCase() === String(nextSubject.subjectName).toLowerCase() &&
+          String(s.type || 'theory') === String(nextSubject.type)
+        )
+      );
+
+      const payload = {
+        month: targetMonth,
+        year: targetYear,
+        subjects: [...withoutSameSubject, nextSubject]
+      };
+
+      await axios.post(`${API_BASE_URL}/api/students/${attendanceForm.prn}/attendance`, payload, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      setAttendanceStatus('[OK] Attendance saved successfully.');
+      setAttendanceForm((prev) => ({
+        ...prev,
+        subjectName: '',
+        totalClasses: '',
+        attendedClasses: ''
+      }));
+    } catch (error) {
+      setAttendanceStatus('[ERR] ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const handleSubmitMarks = async () => {
+    try {
+      if (!marksForm.prn || !marksForm.subjectName || marksForm.internalMarks === '' || marksForm.externalMarks === '') {
+        setMarksStatus('[ERR] PRN, subject name, internal and external marks are required.');
+        return;
+      }
+
+      const token = localStorage.getItem('token');
+      const internalMarks = Number(marksForm.internalMarks);
+      const externalMarks = Number(marksForm.externalMarks);
+      const totalMarks = internalMarks + externalMarks;
+      const grade = marksForm.grade || deriveGradeFromMarks(internalMarks, externalMarks);
+
+      const payload = {
+        year: marksForm.year,
+        semester: Number(marksForm.semester),
+        academicYear: marksForm.academicYear,
+        subjects: [
+          {
+            subjectCode: marksForm.subjectCode,
+            subjectName: marksForm.subjectName,
+            internalMarks,
+            externalMarks,
+            totalMarks,
+            credits: Number(marksForm.credits || 4),
+            grade
+          }
+        ]
+      };
+
+      await axios.post(`${API_BASE_URL}/api/students/${marksForm.prn}/marks`, payload, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      setMarksStatus('[OK] Marks saved successfully.');
+      setMarksForm((prev) => ({
+        ...prev,
+        subjectName: '',
+        subjectCode: '',
+        internalMarks: '',
+        externalMarks: '',
+        grade: ''
+      }));
+    } catch (error) {
+      setMarksStatus('[ERR] ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -915,18 +1165,30 @@ const FacultyDashboard = () => {
                   <h2 className="card-title">{activeTab}</h2>
                 </div>
                 <div className="card-body">
-                  <p style={{ color: 'var(--muted)', marginBottom: '1rem' }}>
-                    Quick placeholder for <strong>{activeTab}</strong>. Replace with real components or forms when available.
-                  </p>
-
                   {activeTab === 'Subjects' && (
-                    <div className="subjects-grid">
-                      {teachingData?.subjects.map((s, i) => (
-                        <div key={i} className="subject-card">
-                          <h4>{s.name}</h4>
-                          <p className="stat-label">Year: {s.year}</p>
+                    <div>
+                      {subjectAnalysisLoading ? (
+                        <div style={{ textAlign: 'center', padding: '1rem' }}>
+                          <div className="spinner"></div>
+                          Loading subject analysis...
                         </div>
-                      ))}
+                      ) : subjectAnalysisError ? (
+                        <p style={{ color: 'var(--danger)' }}>{subjectAnalysisError}</p>
+                      ) : facultySubjectAnalysis.length === 0 ? (
+                        <p style={{ color: 'var(--muted)' }}>No subject analysis available yet.</p>
+                      ) : (
+                        <div className="subjects-grid">
+                          {facultySubjectAnalysis.map((subject, i) => (
+                            <div key={i} className="subject-card">
+                              <h4>{subject.subject}</h4>
+                              <p className="stat-label">Avg Marks: {subject.stats?.average_marks ?? 0}</p>
+                              <p className="stat-label">Highest: {subject.stats?.highest_marks ?? 0}</p>
+                              <p className="stat-label">Lowest: {subject.stats?.lowest_marks ?? 0}</p>
+                              <p className="stat-label">Students: {subject.stats?.total_students ?? 0}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1034,7 +1296,7 @@ const FacultyDashboard = () => {
                                   <p className="stat-label">{course.year} | {course.branch} | {course.division}</p>
                                   {course.attachmentUrl && (
                                     <a
-                                      href={`http://localhost:5000${course.attachmentUrl}`}
+                                      href={`${API_BASE_URL}${course.attachmentUrl}`}
                                       target="_blank"
                                       rel="noreferrer"
                                       className="stat-label"
@@ -1147,7 +1409,7 @@ const FacultyDashboard = () => {
                                   <p className="confidence-label">Submissions: {assignment.submissionCount || 0}</p>
                                   {assignment.attachmentUrl && (
                                     <a
-                                      href={`http://localhost:5000${assignment.attachmentUrl}`}
+                                      href={`${API_BASE_URL}${assignment.attachmentUrl}`}
                                       target="_blank"
                                       rel="noreferrer"
                                       className="confidence-label"
@@ -1181,7 +1443,7 @@ const FacultyDashboard = () => {
                                         <div className="notification-message">{sub.submissionText || 'No message provided.'}</div>
                                         {sub.fileUrl && (
                                           <div className="notification-meta">
-                                            <a href={`http://localhost:5000${sub.fileUrl}`} target="_blank" rel="noreferrer">Download File</a>
+                                            <a href={`${API_BASE_URL}${sub.fileUrl}`} target="_blank" rel="noreferrer">Download File</a>
                                           </div>
                                         )}
                                       </div>
@@ -1201,31 +1463,190 @@ const FacultyDashboard = () => {
 
                   {activeTab === 'MarkAttendance' && (
                     <div>
-                      <p className="confidence-label">Select the subject and mark today's attendance.</p>
-                      <button className="btn btn-primary">Start Attendance</button>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Student PRN *</label>
+                          <input className="form-control" value={attendanceForm.prn} onChange={(e) => setAttendanceForm({ ...attendanceForm, prn: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                          <label>Month</label>
+                          <input className="form-control" value={attendanceForm.month} onChange={(e) => setAttendanceForm({ ...attendanceForm, month: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                          <label>Year</label>
+                          <input className="form-control" type="number" value={attendanceForm.year} onChange={(e) => setAttendanceForm({ ...attendanceForm, year: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Subject Name *</label>
+                          <input className="form-control" value={attendanceForm.subjectName} onChange={(e) => setAttendanceForm({ ...attendanceForm, subjectName: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                          <label>Type</label>
+                          <select className="form-control" value={attendanceForm.type} onChange={(e) => setAttendanceForm({ ...attendanceForm, type: e.target.value })}>
+                            <option value="theory">Theory</option>
+                            <option value="practical">Practical</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Total Classes *</label>
+                          <input className="form-control" type="number" value={attendanceForm.totalClasses} onChange={(e) => setAttendanceForm({ ...attendanceForm, totalClasses: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                          <label>Attended Classes *</label>
+                          <input className="form-control" type="number" value={attendanceForm.attendedClasses} onChange={(e) => setAttendanceForm({ ...attendanceForm, attendedClasses: e.target.value })} />
+                        </div>
+                      </div>
+                      <button className="btn btn-primary" onClick={handleSubmitAttendance}>Save Attendance</button>
+                      {attendanceStatus && <p className="confidence-label" style={{ marginTop: '0.75rem' }}>{attendanceStatus}</p>}
                     </div>
                   )}
 
                   {activeTab === 'EnterMarks' && (
                     <div>
-                      <p className="confidence-label">Enter marks for students (placeholder).</p>
-                      <button className="btn btn-success">Open Marks Entry</button>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Student PRN *</label>
+                          <input className="form-control" value={marksForm.prn} onChange={(e) => setMarksForm({ ...marksForm, prn: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                          <label>Year</label>
+                          <select className="form-control" value={marksForm.year} onChange={(e) => setMarksForm({ ...marksForm, year: e.target.value })}>
+                            <option value="First">First</option>
+                            <option value="Second">Second</option>
+                            <option value="Third">Third</option>
+                            <option value="Fourth">Fourth</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Semester</label>
+                          <input className="form-control" type="number" min="1" max="8" value={marksForm.semester} onChange={(e) => setMarksForm({ ...marksForm, semester: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                          <label>Academic Year</label>
+                          <input className="form-control" value={marksForm.academicYear} onChange={(e) => setMarksForm({ ...marksForm, academicYear: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Subject Name *</label>
+                          <input className="form-control" value={marksForm.subjectName} onChange={(e) => setMarksForm({ ...marksForm, subjectName: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                          <label>Subject Code</label>
+                          <input className="form-control" value={marksForm.subjectCode} onChange={(e) => setMarksForm({ ...marksForm, subjectCode: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                          <label>Internal Marks *</label>
+                          <input className="form-control" type="number" value={marksForm.internalMarks} onChange={(e) => setMarksForm({ ...marksForm, internalMarks: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                          <label>External Marks *</label>
+                          <input className="form-control" type="number" value={marksForm.externalMarks} onChange={(e) => setMarksForm({ ...marksForm, externalMarks: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                          <label>Credits</label>
+                          <input className="form-control" type="number" value={marksForm.credits} onChange={(e) => setMarksForm({ ...marksForm, credits: e.target.value })} />
+                        </div>
+                        <div className="form-group">
+                          <label>Grade (optional)</label>
+                          <input className="form-control" value={marksForm.grade} onChange={(e) => setMarksForm({ ...marksForm, grade: e.target.value.toUpperCase() })} placeholder="Auto if empty" />
+                        </div>
+                      </div>
+                      <button className="btn btn-success" onClick={handleSubmitMarks}>Save Marks</button>
+                      {marksStatus && <p className="confidence-label" style={{ marginTop: '0.75rem' }}>{marksStatus}</p>}
                     </div>
                   )}
 
                   {activeTab === 'Students' && (
                     <div>
-                      <div className="prediction-card">
-                        <h4>Student list placeholder</h4>
-                        <p className="confidence-label">Shows students for selected subject</p>
-                      </div>
+                      {studentsAnalysisLoading ? (
+                        <div style={{ textAlign: 'center', padding: '1rem' }}>
+                          <div className="spinner"></div>
+                          Loading students analysis...
+                        </div>
+                      ) : studentsAnalysisError ? (
+                        <p style={{ color: 'var(--danger)' }}>{studentsAnalysisError}</p>
+                      ) : facultyStudentsAnalysis.length === 0 ? (
+                        <p style={{ color: 'var(--muted)' }}>No students found for analysis.</p>
+                      ) : (
+                        <div className="table-responsive">
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>Student Name</th>
+                                <th>PRN</th>
+                                <th>Year</th>
+                                <th>Division</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {facultyStudentsAnalysis.map((student) => (
+                                <tr key={student._id}>
+                                  <td>{student.studentName}</td>
+                                  <td>{student.prn}</td>
+                                  <td>{student.year}</td>
+                                  <td>{student.division}</td>
+                                  <td>{student.status}</td>
+                                  <td>
+                                    <button
+                                      className="btn-small btn-primary"
+                                      onClick={() => fetchFullStudentAnalysis(student._id)}
+                                    >
+                                      Analysis
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {selectedStudentAnalysis && (
+                        <div className="card" style={{ marginTop: '1rem' }}>
+                          <div className="card-header">
+                            <h2 className="card-title">Student Full Analysis</h2>
+                          </div>
+                          <div className="card-body">
+                            {selectedStudentAnalysis.error ? (
+                              <p style={{ color: 'var(--danger)' }}>{selectedStudentAnalysis.error}</p>
+                            ) : (
+                              <>
+                                <div className="output-grid" style={{ marginBottom: '1rem' }}>
+                                  <div><strong>Name:</strong> {selectedStudentAnalysis.student?.studentName}</div>
+                                  <div><strong>PRN:</strong> {selectedStudentAnalysis.student?.prn}</div>
+                                  <div><strong>Year:</strong> {selectedStudentAnalysis.student?.year}</div>
+                                  <div><strong>Division:</strong> {selectedStudentAnalysis.student?.division}</div>
+                                </div>
+                                <pre>{JSON.stringify(selectedStudentAnalysis, null, 2)}</pre>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {activeTab === 'Timetable' && (
                     <div>
-                      <p className="confidence-label">Mon: Data Structures - 10:00 AM</p>
-                      <p className="confidence-label">Wed: Database Systems - 1:00 PM</p>
+                      {facultyTimetableLoading ? (
+                        <div style={{ textAlign: 'center', padding: '1rem' }}>
+                          <div className="spinner"></div>
+                        </div>
+                      ) : (
+                        <TimetableBoard
+                          timetable={facultyTimetable}
+                          entries={facultyTimetableEntries}
+                          title="My Teaching Timetable"
+                          subtitle="Weekly faculty schedule"
+                          allowPrint
+                          allowExport
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -1466,7 +1887,7 @@ const FacultyDashboard = () => {
             // Refresh unread count after closing
             const fetchUnreadCount = async () => {
               try {
-                const response = await axios.get('http://localhost:5000/api/notifications/unread/count', {
+                const response = await axios.get(`${API_BASE_URL}/api/notifications/unread/count`, {
                   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                 });
                 setUnreadCount(response.data.unreadCount || 0);
@@ -1480,7 +1901,7 @@ const FacultyDashboard = () => {
             // Refresh unread count when a notification is marked as read
             const fetchUnreadCount = async () => {
               try {
-                const response = await axios.get('http://localhost:5000/api/notifications/unread/count', {
+                const response = await axios.get(`${API_BASE_URL}/api/notifications/unread/count`, {
                   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                 });
                 setUnreadCount(response.data.unreadCount || 0);
