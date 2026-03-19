@@ -237,7 +237,7 @@ router.post('/reset-password', async (req, res) => {
       return res.status(401).json({ message: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, jwtSecret);
     
     // Only admin can reset passwords
     if (decoded.role !== 'admin') {
@@ -277,7 +277,7 @@ router.get('/theme', async (req, res) => {
       return res.status(401).json({ message: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, jwtSecret);
     const user = await User.findById(decoded.userId).select('theme');
     
     if (!user) {
@@ -299,7 +299,7 @@ router.put('/theme', async (req, res) => {
       return res.status(401).json({ message: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, jwtSecret);
     const { theme } = req.body;
 
     if (!['light', 'dark', 'system'].includes(theme)) {

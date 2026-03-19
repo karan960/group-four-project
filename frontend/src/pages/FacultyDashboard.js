@@ -21,7 +21,7 @@ import {
   FaChalkboardTeacher, FaChartLine, FaClipboardList, FaCog, FaUser,
   FaBell, FaCheck, FaTimes, FaUsers, FaBook, FaDoorOpen, FaBars,
   FaChevronLeft, FaGraduationCap, FaChartBar, FaBookOpen, FaEdit,
-  FaCalendar, FaHome, FaCheckCircle, FaClock, FaFileAlt, FaLock
+  FaCalendar, FaHome, FaCheckCircle, FaClock, FaFileAlt, FaLock, FaQrcode
 } from 'react-icons/fa';
 import './FacultyDashboard.css';
 import './StudentDashboard.css';
@@ -154,6 +154,8 @@ const FacultyDashboard = () => {
   const [studentsAnalysisLoading, setStudentsAnalysisLoading] = useState(false);
   const [studentsAnalysisError, setStudentsAnalysisError] = useState('');
   const [selectedStudentAnalysis, setSelectedStudentAnalysis] = useState(null);
+  const [selectedStudentAnalysisLoading, setSelectedStudentAnalysisLoading] = useState(false);
+  const [selectedStudentAnalysisError, setSelectedStudentAnalysisError] = useState('');
   const [attendanceForm, setAttendanceForm] = useState({
     prn: '',
     month: 'Overall',
@@ -177,6 +179,91 @@ const FacultyDashboard = () => {
   });
   const [attendanceStatus, setAttendanceStatus] = useState('');
   const [marksStatus, setMarksStatus] = useState('');
+  const [attendanceSessionForm, setAttendanceSessionForm] = useState({
+    subjectName: '',
+    year: 'ALL',
+    branch: 'ALL',
+    division: 'ALL',
+    month: 'Overall',
+    attendanceYear: new Date().getFullYear(),
+    type: 'theory',
+    expiresInMinutes: 15
+  });
+  const [activeAttendanceSession, setActiveAttendanceSession] = useState(null);
+  const [attendanceQr, setAttendanceQr] = useState(null);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [sessionActionStatus, setSessionActionStatus] = useState('');
+  const [sessionLoading, setSessionLoading] = useState(false);
+  const [attendanceSessionHistory, setAttendanceSessionHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [selectedHistorySession, setSelectedHistorySession] = useState(null);
+  const [approvedStudentsForSession, setApprovedStudentsForSession] = useState([]);
+
+  const selectedPerformance = selectedStudentAnalysis?.individual?.performance || {};
+  const selectedTrend = Array.isArray(selectedStudentAnalysis?.improvement?.trend_data)
+    ? selectedStudentAnalysis.improvement.trend_data
+    : [];
+  const selectedSubjectRows = Object.values(selectedStudentAnalysis?.subjects?.subject_wise_analysis || {})
+    .flat()
+    .filter(Boolean);
+  const topSelectedSubjects = [...selectedSubjectRows]
+    .sort((a, b) => Number(b.total_marks || 0) - Number(a.total_marks || 0))
+    .slice(0, 8);
+
+  const selectedPerformanceChartData = {
+    labels: ['Overall', 'Attendance', 'Subject', 'Improvement', 'Consistency'],
+    datasets: [
+      {
+        label: 'Score',
+        data: [
+          Number(selectedPerformance?.overall_performance_score || 0),
+          Number(selectedPerformance?.attendance_score || 0),
+          Number(selectedPerformance?.subject_performance_score || 0),
+          Number(selectedPerformance?.improvement_trend || 0),
+          Number(selectedPerformance?.consistency_score || 0)
+        ],
+        backgroundColor: ['#2980b9', '#16a085', '#8e44ad', '#f39c12', '#2c3e50']
+      }
+    ]
+  };
+
+  const selectedRiskChartData = {
+    labels: ['Placement Probability', 'Remaining Gap'],
+    datasets: [
+      {
+        data: [
+          Number(selectedPerformance?.placement_probability || 0),
+          Math.max(0, 100 - Number(selectedPerformance?.placement_probability || 0))
+        ],
+        backgroundColor: ['#27ae60', '#dfe6e9']
+      }
+    ]
+  };
+
+  const selectedTrendChartData = {
+    labels: selectedTrend.map((point) => `Sem ${point.semester}`),
+    datasets: [
+      {
+        label: 'SGPA Trend',
+        data: selectedTrend.map((point) => Number(point.sgpa || 0)),
+        borderColor: '#3498db',
+        backgroundColor: 'rgba(52, 152, 219, 0.2)',
+        tension: 0.25,
+        fill: true
+      }
+    ]
+  };
+
+  const selectedSubjectChartData = {
+    labels: topSelectedSubjects.map((sub) => sub.subject_name || sub.subject_code || 'Subject'),
+    datasets: [
+      {
+        label: 'Marks',
+        data: topSelectedSubjects.map((sub) => Number(sub.total_marks || 0)),
+        backgroundColor: '#9b59b6'
+      }
+    ]
+  };
 
   const handleViewProfile = () => {
     setShowProfileDetails(true);
@@ -322,6 +409,16 @@ const FacultyDashboard = () => {
     }
   }, [activeTab, facultyData?._id]);
 
+  useEffect(() => {
+    if (activeTab !== 'MarkAttendance') return undefined;
+
+    fetchActiveAttendanceSession();
+    fetchAttendanceSessionHistory();
+    const interval = setInterval(fetchActiveAttendanceSession, 4000);
+
+    return () => clearInterval(interval);
+  }, [activeTab]);
+
   const fetchFacultySubjectAnalysis = async () => {
     try {
       const facultyIdentifier = facultyData?._id || facultyData?.facultyId || user?.referenceId;
@@ -365,6 +462,13 @@ const FacultyDashboard = () => {
 
   const fetchFullStudentAnalysis = async (studentId) => {
     try {
+      if (!studentId) {
+        setSelectedStudentAnalysisError('Invalid student selection. Please refresh and try again.');
+        return;
+      }
+      setSelectedStudentAnalysisLoading(true);
+      setSelectedStudentAnalysisError('');
+      setSelectedStudentAnalysis(null);
       const token = localStorage.getItem('token');
       const response = await axios.get(`${API_BASE_URL}/api/ml-analysis/student/${studentId}/full-analysis`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -372,9 +476,9 @@ const FacultyDashboard = () => {
       setSelectedStudentAnalysis(response.data || null);
     } catch (error) {
       console.error('Error fetching full student analysis:', error);
-      setSelectedStudentAnalysis({
-        error: error.response?.data?.error || error.message
-      });
+      setSelectedStudentAnalysisError(error.response?.data?.error || error.message);
+    } finally {
+      setSelectedStudentAnalysisLoading(false);
     }
   };
 
@@ -693,6 +797,162 @@ const FacultyDashboard = () => {
       }));
     } catch (error) {
       setMarksStatus('[ERR] ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const fetchActiveAttendanceSession = async () => {
+    try {
+      setSessionLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/attendance-sessions/active`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setActiveAttendanceSession(response.data?.session || null);
+      setAttendanceQr(response.data?.qr || null);
+      setPendingRequests(response.data?.requests || []);
+    } catch (error) {
+      console.error('Error fetching active attendance session:', error);
+      setSessionActionStatus('[ERR] Could not refresh attendance session.');
+    } finally {
+      setSessionLoading(false);
+    }
+  };
+
+  const fetchAttendanceSessionHistory = async () => {
+    try {
+      setHistoryLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/attendance-sessions/history?limit=25`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setAttendanceSessionHistory(response.data?.sessions || []);
+    } catch (error) {
+      console.error('Error fetching attendance session history:', error);
+      setSessionActionStatus('[ERR] Could not load session history.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleGenerateAttendanceSession = async () => {
+    try {
+      if (!attendanceSessionForm.subjectName || !attendanceSessionForm.subjectName.trim()) {
+        setSessionActionStatus('[ERR] Subject name is required to generate QR.');
+        return;
+      }
+
+      setSessionActionStatus('Generating attendance session...');
+      const token = localStorage.getItem('token');
+
+      const payload = {
+        subjectName: attendanceSessionForm.subjectName.trim(),
+        year: attendanceSessionForm.year || 'ALL',
+        branch: attendanceSessionForm.branch || 'ALL',
+        division: attendanceSessionForm.division || 'ALL',
+        month: attendanceSessionForm.month || 'Overall',
+        attendanceYear: Number(attendanceSessionForm.attendanceYear || new Date().getFullYear()),
+        type: attendanceSessionForm.type || 'theory',
+        expiresInMinutes: Number(attendanceSessionForm.expiresInMinutes || 15)
+      };
+
+      const response = await axios.post(`${API_BASE_URL}/api/attendance-sessions/create`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setActiveAttendanceSession(response.data?.session || null);
+      setAttendanceQr(response.data?.qr || null);
+      setPendingRequests([]);
+      setSessionActionStatus('[OK] Session QR generated. Ask students to scan and send request.');
+      await fetchAttendanceSessionHistory();
+    } catch (error) {
+      setSessionActionStatus('[ERR] ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const handleAttendanceSessionFieldChange = (field, value) => {
+    setAttendanceSessionForm((prev) => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleApproveAttendanceRequest = async (requestId) => {
+    if (!activeAttendanceSession?._id || !requestId) return;
+
+    try {
+      setSessionActionStatus('Approving request...');
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `${API_BASE_URL}/api/attendance-sessions/${activeAttendanceSession._id}/approve/${requestId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSessionActionStatus('[OK] Request approved.');
+      await fetchActiveAttendanceSession();
+      await fetchAttendanceSessionHistory();
+    } catch (error) {
+      setSessionActionStatus('[ERR] ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const handleApproveAllAttendanceRequests = async () => {
+    if (!activeAttendanceSession?._id) return;
+
+    try {
+      setSessionActionStatus('Approving all pending requests...');
+      const token = localStorage.getItem('token');
+      const response = await axios.put(
+        `${API_BASE_URL}/api/attendance-sessions/${activeAttendanceSession._id}/approve-all`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSessionActionStatus(`[OK] Approved ${response.data?.approvedCount || 0} request(s).`);
+      await fetchActiveAttendanceSession();
+      await fetchAttendanceSessionHistory();
+    } catch (error) {
+      setSessionActionStatus('[ERR] ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const handleCloseAttendanceSession = async () => {
+    if (!activeAttendanceSession?._id) return;
+
+    try {
+      setSessionActionStatus('Closing attendance session...');
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `${API_BASE_URL}/api/attendance-sessions/${activeAttendanceSession._id}/close`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setActiveAttendanceSession(null);
+      setAttendanceQr(null);
+      setPendingRequests([]);
+      setSessionActionStatus('[OK] Session closed successfully.');
+      await fetchAttendanceSessionHistory();
+    } catch (error) {
+      setSessionActionStatus('[ERR] ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const handleViewApprovedStudents = async (sessionId) => {
+    if (!sessionId) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/attendance-sessions/${sessionId}/approved-students`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setSelectedHistorySession(response.data?.session || null);
+      setApprovedStudentsForSession(response.data?.approvedStudents || []);
+    } catch (error) {
+      setSessionActionStatus('[ERR] ' + (error.response?.data?.message || error.message));
+      setSelectedHistorySession(null);
+      setApprovedStudentsForSession([]);
     }
   };
 
@@ -1107,19 +1367,19 @@ const FacultyDashboard = () => {
               <div className="quick-actions-section">
                 <h3>Quick Actions</h3>
                 <div className="quick-actions-grid">
-                  <button className="quick-action-btn">
+                  <button className="quick-action-btn" onClick={() => setActiveTab('MarkAttendance')}>
                     <span className="action-icon"><FaEdit /></span>
                     <span>Mark Today's Attendance</span>
                   </button>
-                  <button className="quick-action-btn">
+                  <button className="quick-action-btn" onClick={() => setActiveTab('EnterMarks')}>
                     <span className="action-icon"><FaClipboardList /></span>
                     <span>Enter Exam Marks</span>
                   </button>
-                  <button className="quick-action-btn">
+                  <button className="quick-action-btn" onClick={() => setActiveTab('Students')}>
                     <span className="action-icon"><FaUsers /></span>
                     <span>Student Performance</span>
                   </button>
-                  <button className="quick-action-btn">
+                  <button className="quick-action-btn" onClick={() => setActiveTab('Subjects')}>
                     <span className="action-icon"><FaChartBar /></span>
                     <span>Generate Reports</span>
                   </button>
@@ -1463,42 +1723,291 @@ const FacultyDashboard = () => {
 
                   {activeTab === 'MarkAttendance' && (
                     <div>
-                      <div className="form-row">
-                        <div className="form-group">
-                          <label>Student PRN *</label>
-                          <input className="form-control" value={attendanceForm.prn} onChange={(e) => setAttendanceForm({ ...attendanceForm, prn: e.target.value })} />
-                        </div>
-                        <div className="form-group">
-                          <label>Month</label>
-                          <input className="form-control" value={attendanceForm.month} onChange={(e) => setAttendanceForm({ ...attendanceForm, month: e.target.value })} />
-                        </div>
-                        <div className="form-group">
-                          <label>Year</label>
-                          <input className="form-control" type="number" value={attendanceForm.year} onChange={(e) => setAttendanceForm({ ...attendanceForm, year: e.target.value })} />
-                        </div>
-                      </div>
+                      <h3 style={{ marginBottom: '1rem' }}><FaQrcode /> Scan & Verify Attendance Workflow</h3>
+
                       <div className="form-row">
                         <div className="form-group">
                           <label>Subject Name *</label>
-                          <input className="form-control" value={attendanceForm.subjectName} onChange={(e) => setAttendanceForm({ ...attendanceForm, subjectName: e.target.value })} />
+                          <input
+                            className="form-control"
+                            value={attendanceSessionForm.subjectName}
+                            onChange={(e) => handleAttendanceSessionFieldChange('subjectName', e.target.value)}
+                            placeholder="e.g. Data Structures"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Year Scope</label>
+                          <input
+                            className="form-control"
+                            value={attendanceSessionForm.year}
+                            onChange={(e) => handleAttendanceSessionFieldChange('year', e.target.value)}
+                            placeholder="ALL / First / Second / Third / Fourth"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Branch Scope</label>
+                          <input
+                            className="form-control"
+                            value={attendanceSessionForm.branch}
+                            onChange={(e) => handleAttendanceSessionFieldChange('branch', e.target.value)}
+                            placeholder="ALL / Computer Science"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Division Scope</label>
+                          <input
+                            className="form-control"
+                            value={attendanceSessionForm.division}
+                            onChange={(e) => handleAttendanceSessionFieldChange('division', e.target.value)}
+                            placeholder="ALL / A / B"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Month</label>
+                          <input
+                            className="form-control"
+                            value={attendanceSessionForm.month}
+                            onChange={(e) => handleAttendanceSessionFieldChange('month', e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Attendance Year</label>
+                          <input
+                            className="form-control"
+                            type="number"
+                            value={attendanceSessionForm.attendanceYear}
+                            onChange={(e) => handleAttendanceSessionFieldChange('attendanceYear', e.target.value)}
+                          />
                         </div>
                         <div className="form-group">
                           <label>Type</label>
-                          <select className="form-control" value={attendanceForm.type} onChange={(e) => setAttendanceForm({ ...attendanceForm, type: e.target.value })}>
+                          <select
+                            className="form-control"
+                            value={attendanceSessionForm.type}
+                            onChange={(e) => handleAttendanceSessionFieldChange('type', e.target.value)}
+                          >
                             <option value="theory">Theory</option>
                             <option value="practical">Practical</option>
                           </select>
                         </div>
                         <div className="form-group">
-                          <label>Total Classes *</label>
-                          <input className="form-control" type="number" value={attendanceForm.totalClasses} onChange={(e) => setAttendanceForm({ ...attendanceForm, totalClasses: e.target.value })} />
-                        </div>
-                        <div className="form-group">
-                          <label>Attended Classes *</label>
-                          <input className="form-control" type="number" value={attendanceForm.attendedClasses} onChange={(e) => setAttendanceForm({ ...attendanceForm, attendedClasses: e.target.value })} />
+                          <label>Expires In (minutes)</label>
+                          <input
+                            className="form-control"
+                            type="number"
+                            min="1"
+                            max="120"
+                            value={attendanceSessionForm.expiresInMinutes}
+                            onChange={(e) => handleAttendanceSessionFieldChange('expiresInMinutes', e.target.value)}
+                          />
                         </div>
                       </div>
-                      <button className="btn btn-primary" onClick={handleSubmitAttendance}>Save Attendance</button>
+
+                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <button className="btn btn-primary" onClick={handleGenerateAttendanceSession}>Generate Session QR</button>
+                        <button className="btn btn-secondary" onClick={fetchActiveAttendanceSession}>Refresh Pending List</button>
+                        {activeAttendanceSession && (
+                          <button className="btn btn-warning" onClick={handleCloseAttendanceSession}>Close Session</button>
+                        )}
+                      </div>
+
+                      {sessionActionStatus && <p className="confidence-label" style={{ marginTop: '0.75rem' }}>{sessionActionStatus}</p>}
+
+                      {activeAttendanceSession && (
+                        <div className="card" style={{ marginTop: '1rem' }}>
+                          <div className="card-header">
+                            <h2 className="card-title">Active Session: {activeAttendanceSession.subjectName}</h2>
+                          </div>
+                          <div className="card-body">
+                            <p className="confidence-label">Session Code: <strong>{activeAttendanceSession.sessionCode}</strong></p>
+                            <p className="confidence-label">Pending: <strong>{activeAttendanceSession.pendingCount || 0}</strong> | Approved: <strong>{activeAttendanceSession.approvedCount || 0}</strong></p>
+                            <p className="confidence-label">Expires At: {new Date(activeAttendanceSession.expiresAt).toLocaleString()}</p>
+                            <p className="confidence-label">Class Scope: {activeAttendanceSession.classScope?.year || 'ALL'} | {activeAttendanceSession.classScope?.branch || 'ALL'} | {activeAttendanceSession.classScope?.division || 'ALL'}</p>
+
+                            {attendanceQr?.imageUrl && (
+                              <div style={{ marginTop: '1rem' }}>
+                                <img
+                                  src={attendanceQr.imageUrl}
+                                  alt="Attendance Session QR"
+                                  style={{ width: '220px', maxWidth: '100%', borderRadius: '10px', border: '1px solid var(--border)' }}
+                                />
+                              </div>
+                            )}
+
+                            <div style={{ marginTop: '1rem' }}>
+                              <h4>Pending Approval ({pendingRequests.length})</h4>
+                              {pendingRequests.length > 0 && (
+                                <button className="btn btn-success" style={{ marginBottom: '0.75rem' }} onClick={handleApproveAllAttendanceRequests}>
+                                  Approve All
+                                </button>
+                              )}
+
+                              {sessionLoading ? (
+                                <p className="confidence-label">Refreshing pending requests...</p>
+                              ) : pendingRequests.length === 0 ? (
+                                <p className="confidence-label">No pending requests right now. Students will appear here in near real-time.</p>
+                              ) : (
+                                <div className="notification-list">
+                                  {pendingRequests.map((request) => (
+                                    <div key={request._id} className="notification-item">
+                                      <div className="notification-body">
+                                        <div className="notification-title">{request.studentName || 'Student'} ({request.studentPRN})</div>
+                                        <div className="notification-message">Requested at {new Date(request.requestedAt).toLocaleTimeString()}</div>
+                                      </div>
+                                      <div>
+                                        <button
+                                          className="btn btn-success"
+                                          onClick={() => handleApproveAttendanceRequest(request._id)}
+                                        >
+                                          Approve
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="card" style={{ marginTop: '1rem' }}>
+                        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <h2 className="card-title">Attendance Sessions</h2>
+                          <button className="btn btn-secondary" onClick={fetchAttendanceSessionHistory}>Refresh Sessions</button>
+                        </div>
+                        <div className="card-body">
+                          {historyLoading ? (
+                            <p className="confidence-label">Loading session history...</p>
+                          ) : attendanceSessionHistory.length === 0 ? (
+                            <p className="confidence-label">No attendance sessions found yet.</p>
+                          ) : (
+                            <div className="table-responsive">
+                              <table className="data-table">
+                                <thead>
+                                  <tr>
+                                    <th>Session Code</th>
+                                    <th>Subject</th>
+                                    <th>Status</th>
+                                    <th>Created At</th>
+                                    <th>Approved</th>
+                                    <th>Pending</th>
+                                    <th>Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {attendanceSessionHistory.map((sessionRow) => (
+                                    <tr key={sessionRow._id}>
+                                      <td>{sessionRow.sessionCode}</td>
+                                      <td>{sessionRow.subjectName}</td>
+                                      <td>{sessionRow.status}</td>
+                                      <td>{new Date(sessionRow.createdAt).toLocaleString()}</td>
+                                      <td>{sessionRow.approvedCount || 0}</td>
+                                      <td>{sessionRow.pendingCount || 0}</td>
+                                      <td>
+                                        <button
+                                          className="btn btn-primary"
+                                          onClick={() => handleViewApprovedStudents(sessionRow._id)}
+                                        >
+                                          View Approved Students
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {selectedHistorySession && (
+                        <div className="card" style={{ marginTop: '1rem' }}>
+                          <div className="card-header">
+                            <h2 className="card-title">
+                              Approved Students: {selectedHistorySession.subjectName} ({selectedHistorySession.sessionCode})
+                            </h2>
+                          </div>
+                          <div className="card-body">
+                            {approvedStudentsForSession.length === 0 ? (
+                              <p className="confidence-label">No approved student requests for this session yet.</p>
+                            ) : (
+                              <div className="table-responsive">
+                                <table className="data-table">
+                                  <thead>
+                                    <tr>
+                                      <th>Student Name</th>
+                                      <th>PRN</th>
+                                      <th>Requested At</th>
+                                      <th>Approved At</th>
+                                      <th>Approved By</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {approvedStudentsForSession.map((studentRow) => (
+                                      <tr key={studentRow.requestId}>
+                                        <td>{studentRow.studentName || 'N/A'}</td>
+                                        <td>{studentRow.studentPRN}</td>
+                                        <td>{studentRow.requestedAt ? new Date(studentRow.requestedAt).toLocaleString() : '-'}</td>
+                                        <td>{studentRow.approvedAt ? new Date(studentRow.approvedAt).toLocaleString() : '-'}</td>
+                                        <td>{studentRow.approvedBy || '-'}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="card" style={{ marginTop: '1rem' }}>
+                        <div className="card-header">
+                          <h2 className="card-title">Manual Attendance Entry (Legacy)</h2>
+                        </div>
+                        <div className="card-body">
+                          <div className="form-row">
+                            <div className="form-group">
+                              <label>Student PRN *</label>
+                              <input className="form-control" value={attendanceForm.prn} onChange={(e) => setAttendanceForm({ ...attendanceForm, prn: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                              <label>Month</label>
+                              <input className="form-control" value={attendanceForm.month} onChange={(e) => setAttendanceForm({ ...attendanceForm, month: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                              <label>Year</label>
+                              <input className="form-control" type="number" value={attendanceForm.year} onChange={(e) => setAttendanceForm({ ...attendanceForm, year: e.target.value })} />
+                            </div>
+                          </div>
+                          <div className="form-row">
+                            <div className="form-group">
+                              <label>Subject Name *</label>
+                              <input className="form-control" value={attendanceForm.subjectName} onChange={(e) => setAttendanceForm({ ...attendanceForm, subjectName: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                              <label>Type</label>
+                              <select className="form-control" value={attendanceForm.type} onChange={(e) => setAttendanceForm({ ...attendanceForm, type: e.target.value })}>
+                                <option value="theory">Theory</option>
+                                <option value="practical">Practical</option>
+                              </select>
+                            </div>
+                            <div className="form-group">
+                              <label>Total Classes *</label>
+                              <input className="form-control" type="number" value={attendanceForm.totalClasses} onChange={(e) => setAttendanceForm({ ...attendanceForm, totalClasses: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                              <label>Attended Classes *</label>
+                              <input className="form-control" type="number" value={attendanceForm.attendedClasses} onChange={(e) => setAttendanceForm({ ...attendanceForm, attendedClasses: e.target.value })} />
+                            </div>
+                          </div>
+                          <button className="btn btn-primary" onClick={handleSubmitAttendance}>Save Attendance</button>
+                        </div>
+                      </div>
+
                       {attendanceStatus && <p className="confidence-label" style={{ marginTop: '0.75rem' }}>{attendanceStatus}</p>}
                     </div>
                   )}
@@ -1621,10 +2130,91 @@ const FacultyDashboard = () => {
                                   <div><strong>PRN:</strong> {selectedStudentAnalysis.student?.prn}</div>
                                   <div><strong>Year:</strong> {selectedStudentAnalysis.student?.year}</div>
                                   <div><strong>Division:</strong> {selectedStudentAnalysis.student?.division}</div>
+                                  <div><strong>Category:</strong> {selectedPerformance?.performance_category || '-'}</div>
+                                  <div><strong>Risk:</strong> {selectedPerformance?.risk_level || '-'}</div>
                                 </div>
-                                <pre>{JSON.stringify(selectedStudentAnalysis, null, 2)}</pre>
+
+                                <div className="charts-grid">
+                                  <div className="chart-card">
+                                    <h3>Performance Components</h3>
+                                    <div className="chart-container">
+                                      <Bar
+                                        data={selectedPerformanceChartData}
+                                        options={{ responsive: true, plugins: { legend: { display: false } } }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="chart-card">
+                                    <h3>Placement Probability</h3>
+                                    <div className="chart-container">
+                                      <Doughnut
+                                        data={selectedRiskChartData}
+                                        options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="charts-grid" style={{ marginTop: '1rem' }}>
+                                  <div className="chart-card">
+                                    <h3>Semester SGPA Trend</h3>
+                                    <div className="chart-container">
+                                      {selectedTrendChartData.labels.length > 0 ? (
+                                        <Line
+                                          data={selectedTrendChartData}
+                                          options={{ responsive: true, plugins: { legend: { display: false } } }}
+                                        />
+                                      ) : (
+                                        <div style={{ color: 'var(--muted)' }}>No semester trend data available.</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="chart-card">
+                                    <h3>Top Subject Scores</h3>
+                                    <div className="chart-container">
+                                      {selectedSubjectChartData.labels.length > 0 ? (
+                                        <Bar
+                                          data={selectedSubjectChartData}
+                                          options={{ responsive: true, plugins: { legend: { display: false } } }}
+                                        />
+                                      ) : (
+                                        <div style={{ color: 'var(--muted)' }}>No subject score data available.</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="card" style={{ marginTop: '1rem' }}>
+                                  <div className="card-header">
+                                    <h3 className="card-title">Personalized Recommendations</h3>
+                                  </div>
+                                  <div className="card-body">
+                                    <ul style={{ margin: 0, paddingLeft: '1rem' }}>
+                                      {(selectedPerformance?.recommendations || []).map((rec, idx) => (
+                                        <li key={`rec-${idx}`}>{rec}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                </div>
                               </>
                             )}
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedStudentAnalysisLoading && (
+                        <div className="card" style={{ marginTop: '1rem' }}>
+                          <div className="card-body" style={{ textAlign: 'center' }}>
+                            <div className="spinner"></div>
+                            Loading detailed student analysis...
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedStudentAnalysisError && (
+                        <div className="card" style={{ marginTop: '1rem' }}>
+                          <div className="card-body">
+                            <p style={{ color: 'var(--danger)', margin: 0 }}>{selectedStudentAnalysisError}</p>
                           </div>
                         </div>
                       )}
@@ -1643,6 +2233,7 @@ const FacultyDashboard = () => {
                           entries={facultyTimetableEntries}
                           title="My Teaching Timetable"
                           subtitle="Weekly faculty schedule"
+                          highlightCurrent
                           allowPrint
                           allowExport
                         />

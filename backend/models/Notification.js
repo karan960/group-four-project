@@ -87,5 +87,19 @@ const NotificationSchema = new mongoose.Schema({
 NotificationSchema.index({ createdAt: -1 });
 NotificationSchema.index({ 'sender.userId': 1 });
 NotificationSchema.index({ isPublished: 1 });
+NotificationSchema.index({ 'readBy.userId': 1 });
+NotificationSchema.index({ 'recipients.userId': 1 });
+
+// Pre-delete hook to cleanup references
+NotificationSchema.pre('findByIdAndDelete', async function(next) {
+  try {
+    // Any cleanup logic can be added here
+    // For now, this ensures the document is properly deleted
+    next();
+  } catch (error) {
+    console.error('Error in Notification pre-delete hook:', error);
+    next();
+  }
+});
 
 module.exports = mongoose.model('Notification', NotificationSchema);

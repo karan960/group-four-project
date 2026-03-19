@@ -21,7 +21,7 @@ import {
   FaGraduationCap, FaChartLine, FaBook, FaClipboardList, FaCog, FaUser,
   FaBell, FaCheck, FaTimes, FaClock, FaFileAlt, FaDoorOpen, FaBars,
   FaChevronLeft, FaEdit, FaCalendar, FaBriefcase, FaHome, FaChartBar,
-  FaCheckCircle, FaBullseye, FaClipboard, FaLock
+  FaCheckCircle, FaBullseye, FaClipboard, FaLock, FaQrcode
 } from 'react-icons/fa';
 import './StudentDashboard.css';
 
@@ -121,6 +121,11 @@ const StudentDashboard = () => {
   const [studentTimetable, setStudentTimetable] = useState(null);
   const [studentTimetableEntries, setStudentTimetableEntries] = useState([]);
   const [studentTimetableLoading, setStudentTimetableLoading] = useState(false);
+  const [scanSessionCode, setScanSessionCode] = useState('');
+  const [attendanceScanStatus, setAttendanceScanStatus] = useState('');
+  const [lastPresenceRequest, setLastPresenceRequest] = useState(null);
+  const [presenceSessionInfo, setPresenceSessionInfo] = useState(null);
+  const [sendingPresenceRequest, setSendingPresenceRequest] = useState(false);
   
   // Settings Modal States
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -166,6 +171,17 @@ const StudentDashboard = () => {
       fetchStudentTimetable();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'AttendanceScan') return undefined;
+    if (!scanSessionCode || !lastPresenceRequest) return undefined;
+
+    const interval = setInterval(() => {
+      fetchPresenceRequestStatus(scanSessionCode);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [activeTab, scanSessionCode, lastPresenceRequest?._id]);
 
   const fetchStudentTimetable = async () => {
     try {
@@ -491,6 +507,65 @@ const StudentDashboard = () => {
     }
   };
 
+  const fetchPresenceRequestStatus = async (sessionCodeArg) => {
+    const targetCode = String(sessionCodeArg || scanSessionCode || '').trim().toUpperCase();
+    if (!targetCode) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/attendance-sessions/${targetCode}/status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setPresenceSessionInfo(response.data?.session || null);
+      setLastPresenceRequest(response.data?.request || null);
+
+      const requestStatus = response.data?.request?.status;
+      if (requestStatus === 'approved') {
+        setAttendanceScanStatus('[OK] Attendance approved by faculty.');
+      } else if (requestStatus === 'rejected') {
+        setAttendanceScanStatus('[ERR] Attendance request rejected by faculty.');
+      } else {
+        setAttendanceScanStatus('Request sent. Show this screen to faculty for verification.');
+      }
+    } catch (error) {
+      if (error.response?.status !== 404) {
+        setAttendanceScanStatus('[ERR] ' + (error.response?.data?.message || error.message));
+      }
+    }
+  };
+
+  const handleSendPresenceRequest = async () => {
+    const normalizedCode = String(scanSessionCode || '').trim().toUpperCase();
+
+    if (!normalizedCode) {
+      setAttendanceScanStatus('[ERR] Enter the session code from the faculty QR.');
+      return;
+    }
+
+    try {
+      setSendingPresenceRequest(true);
+      setAttendanceScanStatus('Sending presence request...');
+      const token = localStorage.getItem('token');
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/attendance-sessions/${normalizedCode}/request`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setScanSessionCode(normalizedCode);
+      setLastPresenceRequest(response.data?.request || null);
+      setPresenceSessionInfo({ sessionCode: normalizedCode, subjectName: 'Attendance Session' });
+      setAttendanceScanStatus(response.data?.message || 'Request sent. Show this screen to faculty.');
+      await fetchPresenceRequestStatus(normalizedCode);
+    } catch (error) {
+      setAttendanceScanStatus('[ERR] ' + (error.response?.data?.message || error.message));
+    } finally {
+      setSendingPresenceRequest(false);
+    }
+  };
+
   const setMockData = () => {
     setStudentData({
       prn: user?.referenceId || 'PRN2023001',
@@ -589,6 +664,70 @@ const StudentDashboard = () => {
     ]
   };
 
+  const fullPerf = fullAnalysis?.individual?.performance || {};
+  const fullTrend = Array.isArray(fullAnalysis?.improvement?.trend_data) ? fullAnalysis.improvement.trend_data : [];
+  const fullSubjectRows = Object.values(fullAnalysis?.subjects?.subject_wise_analysis || {})
+    .flat()
+    .filter(Boolean);
+  const topFullSubjects = [...fullSubjectRows]
+    .sort((a, b) => Number(b.total_marks || 0) - Number(a.total_marks || 0))
+    .slice(0, 8);
+
+  const fullPerformanceChartData = {
+    labels: ['Overall', 'Attendance', 'Subject', 'Improvement', 'Consistency'],
+    datasets: [
+      {
+        label: 'Score',
+        data: [
+          Number(fullPerf?.overall_performance_score || 0),
+          Number(fullPerf?.attendance_score || 0),
+          Number(fullPerf?.subject_performance_score || 0),
+          Number(fullPerf?.improvement_trend || 0),
+          Number(fullPerf?.consistency_score || 0)
+        ],
+        backgroundColor: [primary, success, '#9b59b6', warning, '#2c3e50']
+      }
+    ]
+  };
+
+  const fullPlacementChartData = {
+    labels: ['Placement Probability', 'Remaining'],
+    datasets: [
+      {
+        data: [
+          Number(fullPerf?.placement_probability || 0),
+          Math.max(0, 100 - Number(fullPerf?.placement_probability || 0))
+        ],
+        backgroundColor: [success, '#dfe6e9']
+      }
+    ]
+  };
+
+  const fullTrendChartData = {
+    labels: fullTrend.map((point) => `Sem ${point.semester}`),
+    datasets: [
+      {
+        label: 'SGPA',
+        data: fullTrend.map((point) => Number(point.sgpa || 0)),
+        borderColor: primary,
+        backgroundColor: `rgba(${hexToRgb(primary)}, 0.15)`,
+        fill: true,
+        tension: 0.25
+      }
+    ]
+  };
+
+  const fullSubjectChartData = {
+    labels: topFullSubjects.map((sub) => sub.subject_name || sub.subject_code || 'Subject'),
+    datasets: [
+      {
+        label: 'Marks',
+        data: topFullSubjects.map((sub) => Number(sub.total_marks || 0)),
+        backgroundColor: '#8e44ad'
+      }
+    ]
+  };
+
   if (loading) {
     return (
       <div className="dashboard-loading">
@@ -682,6 +821,21 @@ const StudentDashboard = () => {
               }
             }}
           ><span className="nav-icon"><FaCalendar /></span><span className="nav-label">Schedule</span></a>
+          <a
+            role="button"
+            tabIndex={0}
+            className={`nav-item ${activeTab === 'AttendanceScan' ? 'active' : ''}`}
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('AttendanceScan');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('AttendanceScan');
+              }
+            }}
+          ><span className="nav-icon"><FaQrcode /></span><span className="nav-label">Scan Attendance</span></a>
           <a
             role="button"
             tabIndex={0}
@@ -925,10 +1079,55 @@ const StudentDashboard = () => {
                         </div>
                       )}
 
-                      <details>
-                        <summary>View Complete Analysis JSON</summary>
-                        <pre>{JSON.stringify(fullAnalysis, null, 2)}</pre>
-                      </details>
+                      <div className="charts-grid" style={{ marginBottom: '1rem' }}>
+                        <div className="chart-card">
+                          <h3>Performance Components</h3>
+                          <div className="chart-container">
+                            <Bar
+                              data={fullPerformanceChartData}
+                              options={{ responsive: true, plugins: { legend: { display: false } } }}
+                            />
+                          </div>
+                        </div>
+                        <div className="chart-card">
+                          <h3>Placement Probability</h3>
+                          <div className="chart-container">
+                            <Doughnut
+                              data={fullPlacementChartData}
+                              options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="charts-grid">
+                        <div className="chart-card">
+                          <h3>Semester SGPA Trend</h3>
+                          <div className="chart-container">
+                            {fullTrendChartData.labels.length > 0 ? (
+                              <Line
+                                data={fullTrendChartData}
+                                options={{ responsive: true, plugins: { legend: { display: false } } }}
+                              />
+                            ) : (
+                              <p style={{ color: 'var(--text-secondary)' }}>No semester trend available.</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="chart-card">
+                          <h3>Top Subject Scores</h3>
+                          <div className="chart-container">
+                            {fullSubjectChartData.labels.length > 0 ? (
+                              <Bar
+                                data={fullSubjectChartData}
+                                options={{ responsive: true, plugins: { legend: { display: false } } }}
+                              />
+                            ) : (
+                              <p style={{ color: 'var(--text-secondary)' }}>No subject score data available.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </>
                   ) : (
                     <p style={{ color: 'var(--text-secondary)' }}>Detailed analysis is not available yet. Please try again in a moment.</p>
@@ -986,19 +1185,23 @@ const StudentDashboard = () => {
               <div className="quick-actions-section">
                 <h3>Quick Actions</h3>
                 <div className="quick-actions-grid">
-                  <button className="quick-action-btn">
+                  <button className="quick-action-btn" onClick={() => setActiveTab('Schedule')}>
                     <span className="action-icon"><FaEdit /></span>
                     <span>View TimeTable</span>
                   </button>
-                  <button className="quick-action-btn">
+                  <button className="quick-action-btn" onClick={() => setActiveTab('AttendanceScan')}>
+                    <span className="action-icon"><FaQrcode /></span>
+                    <span>Scan Attendance QR</span>
+                  </button>
+                  <button className="quick-action-btn" onClick={() => setActiveTab('Results')}>
                     <span className="action-icon"><FaClipboard /></span>
                     <span>Check Results</span>
                   </button>
-                  <button className="quick-action-btn">
+                  <button className="quick-action-btn" onClick={() => setActiveTab('Placements')}>
                     <span className="action-icon"><FaBriefcase /></span>
                     <span>Placement Cell</span>
                   </button>
-                  <button className="quick-action-btn">
+                  <button className="quick-action-btn" onClick={() => setActiveTab('Courses')}>
                     <span className="action-icon"><FaBook /></span>
                     <span>Study Materials</span>
                   </button>
@@ -1136,9 +1339,63 @@ const StudentDashboard = () => {
                           entries={studentTimetableEntries}
                           title="My Weekly Schedule"
                           subtitle="Filtered by your class/division/batch"
+                          highlightCurrent
                           allowPrint
                           allowExport
                         />
+                      )}
+                    </div>
+                  )}
+
+                  {activeTab === 'AttendanceScan' && (
+                    <div>
+                      <h3 style={{ marginBottom: '1rem' }}><FaQrcode /> Scan & Verify Attendance</h3>
+                      <p className="confidence-label" style={{ marginBottom: '1rem' }}>
+                        Scan the faculty QR in your app and enter the session code (or paste it) to send your presence request.
+                      </p>
+
+                      <div className="form-row">
+                        <div className="form-group" style={{ maxWidth: '320px' }}>
+                          <label>Session Code *</label>
+                          <input
+                            className="form-control"
+                            placeholder="e.g. A1B2C3"
+                            value={scanSessionCode}
+                            onChange={(e) => setScanSessionCode(String(e.target.value || '').toUpperCase())}
+                            maxLength={12}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <button className="btn btn-primary" onClick={handleSendPresenceRequest} disabled={sendingPresenceRequest}>
+                          {sendingPresenceRequest ? 'Sending...' : 'Send Presence Request'}
+                        </button>
+                        <button className="btn btn-secondary" onClick={() => fetchPresenceRequestStatus(scanSessionCode)}>
+                          Refresh Request Status
+                        </button>
+                      </div>
+
+                      {attendanceScanStatus && (
+                        <p className="confidence-label" style={{ marginTop: '0.85rem' }}>{attendanceScanStatus}</p>
+                      )}
+
+                      {lastPresenceRequest && (
+                        <div className="card" style={{ marginTop: '1rem' }}>
+                          <div className="card-header">
+                            <h2 className="card-title">Request Sent</h2>
+                          </div>
+                          <div className="card-body">
+                            <p className="confidence-label"><strong>Name:</strong> {studentData?.studentName || user?.username}</p>
+                            <p className="confidence-label"><strong>PRN:</strong> {studentData?.prn || user?.referenceId}</p>
+                            <p className="confidence-label"><strong>Session Code:</strong> {presenceSessionInfo?.sessionCode || scanSessionCode}</p>
+                            <p className="confidence-label"><strong>Status:</strong> {String(lastPresenceRequest.status || 'pending').toUpperCase()}</p>
+                            <p className="confidence-label"><strong>Requested At:</strong> {new Date(lastPresenceRequest.requestedAt || Date.now()).toLocaleString()}</p>
+                            <p className="confidence-label" style={{ marginTop: '0.75rem' }}>
+                              Show this screen to the faculty for identity verification.
+                            </p>
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}

@@ -9,6 +9,12 @@ const Course = require('../models/Course');
 const Student = require('../models/Student');
 const Faculty = require('../models/Faculty');
 
+// ==================== NORMALIZATION HELPERS ====================
+const normalizeTarget = (value) => {
+  if (!value) return '';
+  return String(value || '').trim().toUpperCase();
+};
+
 // Multer setup for assignment submissions/attachments
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -55,9 +61,46 @@ router.get('/', async (req, res) => {
       if (!student) {
         return res.json({ assignments: [] });
       }
-      query.targetYear = student.year;
-      query.targetBranch = student.branch;
-      query.targetDivision = student.division;
+
+      // Support both strictly targeted assignments and generic/broadcast assignments.
+      // This avoids "missing assignments" when any target field is blank or uses ALL.
+      // Issue #5: Normalize targets before comparison
+      const normalizeBranch = (value) => String(value || '').trim().toUpperCase();
+      const normalizeYear = (value) => String(value || '').trim();
+      const normalizeDivision = (value) => String(value || '').trim();
+
+      const branchCandidates = [student.branch, student.department, 'ALL']
+        .filter(Boolean)
+        .map((value) => normalizeBranch(value));
+
+      query.$and = [
+        {
+          $or: [
+            { targetYear: normalizeYear(student.year) },
+            { targetYear: 'ALL' },
+            { targetYear: { $exists: false } },
+            { targetYear: null },
+            { targetYear: '' }
+          ]
+        },
+        {
+          $or: [
+            { targetBranch: { $in: branchCandidates } },
+            { targetBranch: { $exists: false } },
+            { targetBranch: null },
+            { targetBranch: '' }
+          ]
+        },
+        {
+          $or: [
+            { targetDivision: normalizeDivision(student.division) },
+            { targetDivision: 'ALL' },
+            { targetDivision: { $exists: false } },
+            { targetDivision: null },
+            { targetDivision: '' }
+          ]
+        }
+      ];
     }
 
     const assignments = await Assignment.find(query)
@@ -138,9 +181,10 @@ router.post('/', upload.single('file'), async (req, res) => {
       dueDate: new Date(dueDate),
       totalMarks,
       attachmentUrl: `/${req.file.path.replace(/\\/g, '/')}`,
-      targetYear: course.year,
-      targetBranch: course.branch,
-      targetDivision: course.division,
+      // Issue #5: Normalize target values to ensure consistent matching
+      targetYear: normalizeTarget(course.year),
+      targetBranch: normalizeTarget(course.branch),
+      targetDivision: normalizeTarget(course.division),
       createdBy: {
         userId,
         username,

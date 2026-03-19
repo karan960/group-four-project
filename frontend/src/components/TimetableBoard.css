@@ -53,6 +53,15 @@
   margin-bottom: 0.45rem;
 }
 
+.timetable-current-cell {
+  background: rgba(33, 150, 243, 0.08);
+}
+
+.timetable-entry-chip.ongoing {
+  border-color: #2196f3;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.22);
+}
+
 .timetable-entry-chip:last-child {
   margin-bottom: 0;
 }

@@ -14,6 +14,15 @@ from models.performance_model import (
 performance_bp = Blueprint("performance", __name__, url_prefix="/api/ml/performance")
 analyzer = StudentPerformanceAnalyzer()
 
+# Restore model state after ML API restart if artifact exists.
+DEFAULT_MODEL_PATH = "models/performance_model.joblib"
+if os.path.exists(DEFAULT_MODEL_PATH):
+    try:
+        analyzer.load_model(DEFAULT_MODEL_PATH)
+    except Exception:
+        # Keep API available even when artifact is stale/corrupt.
+        pass
+
 
 def _students_payload(data):
     students = data.get("students", []) if isinstance(data, dict) else []
@@ -39,6 +48,8 @@ def model_info():
             "accuracy": (analyzer.metrics.get("accuracy", 0) * 100) if analyzer.metrics else 0,
             "metrics": analyzer.metrics,
             "featureImportance": analyzer.feature_importance,
+            "rows_used": analyzer.rows_used,
+            "class_distribution": analyzer.class_distribution,
         }
     )
 

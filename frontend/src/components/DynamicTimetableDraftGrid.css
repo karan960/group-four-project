@@ -1,0 +1,64 @@
+.dynamic-draft-grid {
+  margin-top: 1rem;
+}
+
+.draft-grid-table th,
+.draft-grid-table td {
+  vertical-align: top;
+  min-width: 160px;
+}
+
+.time-cell {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.locked-row {
+  background: rgba(255, 193, 7, 0.08);
+}
+
+.locked-cell {
+  background: rgba(255, 193, 7, 0.16);
+}
+
+.break-chip {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #8a6d00;
+}
+
+.empty-chip {
+  font-size: 0.82rem;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 0.6rem;
+}
+
+.chip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.subject-chip {
+  background: var(--table-header);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  cursor: grab;
+}
+
+.subject-chip:active {
+  cursor: grabbing;
+}
+
+.chip-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chip-meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+}

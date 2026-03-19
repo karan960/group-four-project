@@ -12,8 +12,30 @@ const courseSchema = new mongoose.Schema({
   createdBy: {
     userId: { type: mongoose.Schema.Types.ObjectId, required: true },
     username: String,
-    facultyId: String,
+    // Issue #9: Add Faculty reference with validation
+    facultyId: {
+      type: String,
+      validate: {
+        validator: async function(value) {
+          if (!value) return true; // Optional facultyId
+          try {
+            const Faculty = require('./Faculty');
+            const faculty = await Faculty.findOne({ facultyId: value });
+            return !!faculty;
+          } catch (error) {
+            console.error('Faculty validation error:', error);
+            return true; // Allow on error
+          }
+        },
+        message: 'Faculty with this ID does not exist'
+      }
+    },
     name: String
+  },
+  // Issue #9: Add reference for easier lookups
+  facultyIdReference: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Faculty'
   },
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });

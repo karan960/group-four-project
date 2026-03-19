@@ -8,6 +8,7 @@ const Student = require('../models/Student');
 const Subject = require('../models/Subject');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const { generateDynamicTimetableDraft } = require('../utils/dynamicTimetableGenerator');
 
 const router = express.Router();
 
@@ -461,6 +462,61 @@ router.post('/admin/upload-timetable', requireRole('admin'), upload.single('file
 
     res.status(500).json({
       message: 'Failed to upload timetable due to server error',
+      error: error.message
+    });
+  }
+});
+
+router.post('/admin/generate-dynamic-timetable', requireRole('admin'), async (req, res) => {
+  try {
+    const { academicYear, semester, requirements, saveDrafts = false } = req.body || {};
+
+    if (!Array.isArray(requirements) || requirements.length === 0) {
+      return res.status(400).json({ message: 'At least one subject requirement is required to generate timetable.' });
+    }
+
+    const result = generateDynamicTimetableDraft({
+      academicYear,
+      semester,
+      requirements
+    });
+
+    let savedDrafts = [];
+    if (saveDrafts) {
+      savedDrafts = [];
+      for (const draft of result.drafts || []) {
+        const timetableDoc = new Timetable({
+          ...draft.timetable,
+          createdBy: {
+            userId: req.user.userId,
+            username: req.user.username
+          },
+          sourceFileName: 'dynamic-generator',
+          parseWarnings: result.warnings || []
+        });
+
+        timetableDoc.validationWarnings = await validateTimetable(timetableDoc);
+        await timetableDoc.save();
+
+        savedDrafts.push({
+          _id: timetableDoc._id,
+          className: timetableDoc.className,
+          division: timetableDoc.division,
+          year: draft.year,
+          entriesCount: (timetableDoc.entries || []).length,
+          warnings: timetableDoc.validationWarnings || []
+        });
+      }
+    }
+
+    return res.json({
+      message: saveDrafts ? 'Dynamic timetable generated and saved successfully.' : 'Dynamic timetable draft generated successfully.',
+      ...result,
+      savedDrafts
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: 'Failed to generate dynamic timetable draft',
       error: error.message
     });
   }

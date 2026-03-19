@@ -51,5 +51,36 @@ const facultySchema = new mongoose.Schema({
 // Index for faster queries
 facultySchema.index({ facultyId: 1 });
 facultySchema.index({ department: 1 });
+facultySchema.index({ email: 1 });
+
+// Issue #9: Pre-delete hook to mark courses as inactive when faculty is deleted
+facultySchema.pre('findByIdAndDelete', async function(next) {
+  try {
+    const Course = require('./Course');
+    // Get the faculty document to access facultyId
+    const facultyObjId = this.getFilter()._id;
+    
+    // Find faculty first to get the facultyId
+    const faculty = await this.model.findById(facultyObjId);
+    if (faculty && faculty.facultyId) {
+      // Mark courses as inactive when faculty is deleted
+      const result = await Course.updateMany(
+        { 'createdBy.facultyId': faculty.facultyId, isActive: true },
+        { 
+          $set: { 
+            isActive: false,
+            'createdBy.name': 'Inactive Faculty',
+            lastUpdated: new Date()
+          }
+        }
+      );
+      console.log(`Marked ${result.modifiedCount} courses as inactive for deleted faculty ${faculty.facultyId}`);
+    }
+    next();
+  } catch (error) {
+    console.error('Error in Faculty pre-delete hook:', error);
+    next();
+  }
+});
 
 module.exports = mongoose.model('Faculty', facultySchema);

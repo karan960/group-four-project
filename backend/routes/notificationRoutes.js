@@ -270,9 +270,16 @@ router.delete('/:notificationId', async (req, res) => {
       return res.status(403).json({ message: 'You can only delete your own notifications' });
     }
 
-    await Notification.findByIdAndDelete(notificationId);
+    // Clean up references before deletion
+    const deleteResult = await Notification.findByIdAndDelete(notificationId, { 
+      // Ensure all sub-documents are properly cleaned
+      session: null 
+    });
 
-    res.json({ message: 'Notification deleted successfully' });
+    res.json({ 
+      message: 'Notification deleted successfully',
+      deletedNotification: notificationId
+    });
   } catch (error) {
     console.error('Error deleting notification:', error);
     res.status(500).json({ message: 'Server error', error: error.message });

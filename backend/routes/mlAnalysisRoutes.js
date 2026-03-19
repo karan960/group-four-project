@@ -4,7 +4,10 @@ const axios = require('axios');
 const Student = require('../models/Student');
 const Faculty = require('../models/Faculty');
 
-const ML_API_URL = process.env.ML_API_URL || 'http://localhost:5001/api/ml/performance';
+const RAW_ML_API_URL = process.env.ML_API_URL || 'http://localhost:5001/api/ml/performance';
+const ML_API_URL = RAW_ML_API_URL.includes('/api/ml/performance')
+  ? RAW_ML_API_URL.replace(/\/$/, '')
+  : `${RAW_ML_API_URL.replace(/\/$/, '')}/api/ml/performance`;
 
 const buildStudentQuery = ({ year, branch, division }) => {
   const query = { isActive: true };

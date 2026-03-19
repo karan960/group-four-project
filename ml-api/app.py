@@ -116,6 +116,8 @@ def model_info_compat():
             "trained": analyzer.is_trained,
             "metrics": analyzer.metrics,
             "featureImportance": analyzer.feature_importance,
+            "rows_used": analyzer.rows_used,
+            "class_distribution": analyzer.class_distribution,
         }
     )
 

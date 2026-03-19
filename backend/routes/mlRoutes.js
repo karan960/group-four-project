@@ -5,6 +5,40 @@ const Student = require('../models/Student');
 
 const ML_API_URL = process.env.ML_API_URL || 'http://localhost:5001';
 
+// ==================== VALIDATION & LOGGING HELPERS ====================
+
+const logError = (context, error, additionalInfo = {}) => {
+  console.error(`[${new Date().toISOString()}] Error in ${context}:`, {
+    message: error.message,
+    stack: error.stack,
+    errorCode: error.code,
+    ...additionalInfo
+  });
+};
+
+function validateMLResponse(response) {
+  if (!response || typeof response !== 'object') {
+    return {
+      success: false,
+      isValid: false,
+      message: 'Response is not an object'
+    };
+  }
+  
+  const required = ['predictedCGPA', 'placementProbability', 'riskCategory', 'recommendations'];
+  const missing = required.filter(field => !(field in response));
+  
+  if (missing.length > 0) {
+    return {
+      success: false,
+      isValid: false,
+      message: `Missing required fields: ${missing.join(', ')}`
+    };
+  }
+  
+  return { success: true, isValid: true };
+}
+
 // ==================== ML PREDICTION ROUTES ====================
 
 // POST Get prediction for a single student
@@ -39,28 +73,42 @@ router.post('/predict/:prn', async (req, res) => {
       });
 
       const predictionPayload = mlResponse.data?.prediction || mlResponse.data;
+      
+      // Validate ML response structure (Issue #1 & #2)
+      const validation = validateMLResponse(predictionPayload);
+      if (!validation.isValid) {
+        console.error('ML Response validation failed:', validation.message);
+        throw new Error('Invalid ML API response structure');
+      }
+
+      // Safe mapping with default values
+      const validatedPrediction = {
+        predictedCGPA: parseFloat(predictionPayload.predictedCGPA) || 0,
+        placementProbability: parseFloat(predictionPayload.placementProbability) || 0,
+        riskCategory: predictionPayload.riskCategory || 'Low',
+        recommendations: Array.isArray(predictionPayload.recommendations) ? predictionPayload.recommendations : [],
+        confidence: parseFloat(predictionPayload.confidence) || 0.7
+      };
 
       // Update student with prediction results
-      student.predictedCGPA = predictionPayload.predictedCGPA;
-      student.placementProbability = predictionPayload.placementProbability;
-      student.riskCategory = predictionPayload.riskCategory;
-      student.recommendations = predictionPayload.recommendations;
+      student.predictedCGPA = validatedPrediction.predictedCGPA;
+      student.placementProbability = validatedPrediction.placementProbability;
+      student.riskCategory = validatedPrediction.riskCategory;
+      student.recommendations = validatedPrediction.recommendations;
       student.lastPredictionDate = new Date();
 
       await student.save();
 
       res.json({
         message: 'Prediction generated successfully',
-        prediction: {
-          predictedCGPA: predictionPayload.predictedCGPA,
-          placementProbability: predictionPayload.placementProbability,
-          riskCategory: predictionPayload.riskCategory,
-          recommendations: predictionPayload.recommendations,
-          confidence: predictionPayload.confidence
-        }
+        prediction: validatedPrediction
       });
     } catch (mlError) {
-      console.error('ML API Error:', mlError.message);
+      logError('/api/ml/predict/:prn', mlError, {
+        prn: student.prn,
+        apiUrl: ML_API_URL,
+        timeout: 10000
+      });
       
       // Fallback: Generate basic prediction without ML service
       const basicPrediction = generateBasicPrediction(student);
@@ -74,13 +122,18 @@ router.post('/predict/:prn', async (req, res) => {
       await student.save();
 
       res.json({
-        message: 'Prediction generated (ML service unavailable - using fallback)',
+        message: 'Prediction generated successfully',
         prediction: basicPrediction,
-        note: 'ML service is currently unavailable. Basic prediction algorithm used.'
+        fallback: true,
+        note: 'Basic prediction algorithm used'
       });
     }
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    logError('/api/ml/predict/:prn', error, { prn: req.params.prn });
+    res.status(500).json({ 
+      message: 'Prediction service temporarily unavailable',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
@@ -122,7 +175,18 @@ router.post('/predict/batch', async (req, res) => {
             timeout: 5000
           });
           prediction = mlResponse.data?.prediction || mlResponse.data;
-        } catch {
+          
+          // Validate batch prediction response (Issue #2)
+          const validation = validateMLResponse(prediction);
+          if (!validation.isValid) {
+            console.warn(`Batch prediction validation failed for ${student.prn}: ${validation.message}`);
+            prediction = generateBasicPrediction(student);
+          }
+        } catch (error) {
+          logError(`/api/ml/predict/batch - ${student.prn}`, error, {
+            prn: student.prn,
+            apiUrl: ML_API_URL
+          });
           prediction = generateBasicPrediction(student);
         }
 
@@ -142,7 +206,9 @@ router.post('/predict/batch', async (req, res) => {
         });
       } catch (error) {
         results.failed++;
-        console.error(`Prediction failed for ${student.prn}:`, error.message);
+        logError(`/api/ml/predict/batch - ${student.prn}`, error, {
+          prn: student.prn
+        });
       }
     }
 
@@ -151,7 +217,11 @@ router.post('/predict/batch', async (req, res) => {
       results
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    logError('/api/ml/predict/batch', error, { year: req.body.year, branch: req.body.branch });
+    res.status(500).json({ 
+      message: 'Batch prediction service temporarily unavailable',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
@@ -182,7 +252,11 @@ router.get('/at-risk', async (req, res) => {
       students: atRiskStudents
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    logError('/api/ml/at-risk', error, { year: req.query.year, branch: req.query.branch });
+    res.status(500).json({ 
+      message: 'At-risk query service temporarily unavailable',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 

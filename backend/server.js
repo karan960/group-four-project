@@ -116,6 +116,7 @@ const courseRoutes = require('./routes/courseRoutes');
 const assignmentRoutes = require('./routes/assignmentRoutes');
 const timetableRoutes = require('./routes/timetableRoutes');
 const timetablePublicRoutes = require('./routes/timetablePublicRoutes');
+const attendanceSessionRoutes = require('./routes/attendanceSessionRoutes');
 
 // ==================== MIDDLEWARE ====================
 const authMiddleware = async (req, res, next) => {
@@ -211,6 +212,7 @@ app.use('/api/change-requests', authMiddleware, changeRequestRoutes);
 app.use('/api/notifications', authMiddleware, notificationRoutes);
 app.use('/api/courses', authMiddleware, courseRoutes);
 app.use('/api/assignments', authMiddleware, assignmentRoutes);
+app.use('/api/attendance-sessions', authMiddleware, attendanceSessionRoutes);
 app.use('/api', authMiddleware, timetableRoutes);
 app.use('/api', timetablePublicRoutes);
 

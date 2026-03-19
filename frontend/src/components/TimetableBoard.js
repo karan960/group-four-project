@@ -10,7 +10,8 @@ const TimetableBoard = ({
   title = 'Weekly Timetable',
   subtitle = '',
   allowPrint = true,
-  allowExport = true
+  allowExport = true,
+  highlightCurrent = false
 }) => {
   const timeSlotMap = useMemo(() => {
     const map = new Map();
@@ -53,6 +54,22 @@ const TimetableBoard = ({
 
     return map;
   }, [entries, timeSlotMap]);
+
+  const currentCellKey = useMemo(() => {
+    if (!highlightCurrent) return null;
+
+    const now = new Date();
+    const jsDay = now.getDay();
+    if (jsDay === 0 || jsDay === 6) return null;
+
+    const day = DAYS[jsDay - 1];
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const matchingSlot = slotRows.find((slot) => slot.startTime <= currentTime && currentTime < slot.endTime);
+    if (!matchingSlot) return null;
+
+    return `${day}-${matchingSlot.startTime}-${matchingSlot.endTime}`;
+  }, [highlightCurrent, slotRows]);
 
   const handleExportCsv = () => {
     if (!slotRows.length) return;
@@ -148,13 +165,13 @@ const TimetableBoard = ({
                     const list = cellEntries.get(key) || [];
 
                     return (
-                      <td key={key}>
+                      <td key={key} className={currentCellKey === key ? 'timetable-current-cell' : ''}>
                         {list.length === 0 ? (
                           <span className="timetable-muted">-</span>
                         ) : (
                           <div className="timetable-cell-list">
                             {list.map((item, idx) => (
-                              <div key={`${key}-${idx}`} className="timetable-entry-chip">
+                              <div key={`${key}-${idx}`} className={`timetable-entry-chip ${currentCellKey === key ? 'ongoing' : ''}`}>
                                 <div className="entry-main">{item.subjectName || item.subjectCode || 'Class'}</div>
                                 <div className="entry-meta">
                                   {(item.staffShortcode || item.staffName || 'TBA')}

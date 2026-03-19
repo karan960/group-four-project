@@ -1,8 +1,28 @@
 const express = require('express');
 const router = express.Router();
+const axios = require('axios');
 const Student = require('../models/Student');
 const Faculty = require('../models/Faculty');
 const User = require('../models/User');
+
+const RAW_ML_API_URL = process.env.ML_API_URL || 'http://localhost:5001/api/ml/performance';
+const ML_ANALYSIS_API_URL = RAW_ML_API_URL.includes('/api/ml/performance')
+  ? RAW_ML_API_URL.replace(/\/$/, '')
+  : `${RAW_ML_API_URL.replace(/\/$/, '')}/api/ml/performance`;
+
+const formatStudentDataForAnalysis = (student) => ({
+  prn: student.prn,
+  studentName: student.studentName,
+  rollNo: student.rollNo,
+  cgpa: student.cgpa || 0,
+  overallAttendance: student.overallAttendance || 0,
+  semesterMarks: student.semesterMarks || [],
+  attendance: student.attendance || [],
+  backlogs: student.backlogs || 0,
+  year: student.year,
+  branch: student.branch,
+  division: student.division
+});
 
 // ==================== ADMIN DASHBOARD STATISTICS ====================
 
@@ -232,6 +252,34 @@ router.get('/student/:prn', async (req, res) => {
       status: sem.status
     }));
 
+    let mlPrediction = {
+      predictedCGPA: student.predictedCGPA,
+      placementProbability: student.placementProbability,
+      riskCategory: student.riskCategory,
+      recommendations: student.recommendations
+    };
+
+    try {
+      const studentData = formatStudentDataForAnalysis(student);
+      const analysisResponse = await axios.post(
+        `${ML_ANALYSIS_API_URL}/individual/${student._id}`,
+        studentData,
+        { timeout: 8000 }
+      );
+      const performance = analysisResponse.data?.performance || {};
+      mlPrediction = {
+        predictedCGPA: Number(student.predictedCGPA || student.cgpa || 0),
+        placementProbability: Number(performance.placement_probability || student.placementProbability || 0),
+        riskCategory: performance.risk_level || student.riskCategory || 'Unknown',
+        recommendations: Array.isArray(performance.recommendations)
+          ? performance.recommendations
+          : (student.recommendations || [])
+      };
+    } catch (mlError) {
+      // Keep dashboard available even if ML service is temporarily unavailable.
+      console.warn('Student dashboard ML enrichment failed:', mlError.message);
+    }
+
     const dashboard = {
       profile: {
         prn: student.prn,
@@ -259,10 +307,10 @@ router.get('/student/:prn', async (req, res) => {
         package: student.package
       },
       predictions: {
-        predictedCGPA: student.predictedCGPA,
-        placementProbability: student.placementProbability,
-        riskCategory: student.riskCategory,
-        recommendations: student.recommendations
+        predictedCGPA: mlPrediction.predictedCGPA,
+        placementProbability: mlPrediction.placementProbability,
+        riskCategory: mlPrediction.riskCategory,
+        recommendations: mlPrediction.recommendations
       },
       achievements: {
         internships: student.internships?.length || 0,
@@ -299,6 +347,21 @@ router.get('/faculty/:facultyId', async (req, res) => {
       isActive: true
     });
 
+    let mlAtRiskCount = students.filter(s => s.riskCategory === 'High').length;
+    try {
+      if (students.length > 0) {
+        const studentsData = students.map(formatStudentDataForAnalysis);
+        const mlStats = await axios.post(
+          `${ML_ANALYSIS_API_URL}/faculty-statistics`,
+          { students: studentsData },
+          { timeout: 12000 }
+        );
+        mlAtRiskCount = Number(mlStats.data?.statistics?.students_at_risk || 0);
+      }
+    } catch (mlError) {
+      console.warn('Faculty dashboard ML enrichment failed:', mlError.message);
+    }
+
     const dashboard = {
       profile: {
         facultyId: faculty.facultyId,
@@ -317,7 +380,7 @@ router.get('/faculty/:facultyId', async (req, res) => {
         avgCGPA: students.reduce((sum, s) => sum + (s.cgpa || 0), 0) / students.length || 0,
         avgAttendance: students.reduce((sum, s) => sum + (s.overallAttendance || 0), 0) / students.length || 0,
         withBacklogs: students.filter(s => s.backlogs > 0).length,
-        atRisk: students.filter(s => s.riskCategory === 'High').length
+        atRisk: mlAtRiskCount
       },
       research: {
         publications: faculty.publications?.length || 0,

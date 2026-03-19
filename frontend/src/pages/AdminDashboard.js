@@ -199,7 +199,14 @@ const DashboardOverview = () => {
     totalFaculty: 0,
     totalUsers: 0,
     mlAccuracy: 0,
-    yearWiseStudents: { First: 0, Second: 0, Third: 0, Fourth: 0 }
+    yearWiseStudents: { First: 0, Second: 0, Third: 0, Fourth: 0 },
+    performanceDistribution: {
+      excellent: 0,
+      very_good: 0,
+      good: 0,
+      average: 0,
+      below_average: 0
+    }
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -215,12 +222,26 @@ const DashboardOverview = () => {
   useEffect(() => {
     fetchDashboardStats(true);
 
+    const onModelUpdated = () => fetchDashboardStats(false);
+    window.addEventListener('ml-model-updated', onModelUpdated);
+
     const intervalId = setInterval(() => {
       fetchDashboardStats(false);
     }, REFRESH_INTERVAL);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('ml-model-updated', onModelUpdated);
+    };
   }, []);
+
+  const normalizeDistribution = (distribution = {}) => ({
+    excellent: Number(distribution.excellent || 0),
+    very_good: Number(distribution.very_good || 0),
+    good: Number(distribution.good || 0),
+    average: Number(distribution.average || 0),
+    below_average: Number(distribution.below_average || 0)
+  });
 
   const fetchDashboardStats = async (showLoader = false) => {
     try {
@@ -229,24 +250,39 @@ const DashboardOverview = () => {
       }
       const token = localStorage.getItem('token');
 
-      const [overviewResponse, dashboardResponse] = await Promise.all([
+      const [overviewResponse, dashboardResponse, modelInfoResponse, institutionStatsResponse] = await Promise.allSettled([
         axios.get(`${API_BASE_URL}/api/dashboard/admin/overview`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         axios.get(`${API_BASE_URL}/api/dashboard/admin/dashboard`, {
           headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        axios.get(`${API_BASE_URL}/api/ml-analysis/model-info`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        axios.get(`${API_BASE_URL}/api/ml-analysis/institution-stats`, {
+          headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
 
-      const overviewStats = overviewResponse.data?.stats || {};
-      const studentStats = dashboardResponse.data?.studentStats || {};
+      const overviewStats = overviewResponse.status === 'fulfilled' ? (overviewResponse.value?.data?.stats || {}) : {};
+      const dashboardData = dashboardResponse.status === 'fulfilled' ? (dashboardResponse.value?.data || {}) : {};
+      const studentStats = dashboardData?.studentStats || {};
+      const modelInfo = modelInfoResponse.status === 'fulfilled' ? (modelInfoResponse.value?.data || {}) : {};
+      const institutionStats = institutionStatsResponse.status === 'fulfilled'
+        ? (institutionStatsResponse.value?.data?.statistics || {})
+        : {};
+      const rawAccuracy = typeof modelInfo.accuracy === 'number'
+        ? modelInfo.accuracy
+        : Number((modelInfo.metrics?.accuracy || 0) * 100);
 
       setStats({
         totalStudents: Number(overviewStats.totalStudents ?? studentStats.total ?? 0),
-        totalFaculty: Number(overviewStats.totalFaculty ?? dashboardResponse.data?.facultyStats?.total ?? 0),
+        totalFaculty: Number(overviewStats.totalFaculty ?? dashboardData?.facultyStats?.total ?? 0),
         totalUsers: Number(overviewStats.totalUsers ?? 0),
-        mlAccuracy: 85.5,
-        yearWiseStudents: toYearWiseStudents(studentStats.byYear || {})
+        mlAccuracy: Number.isFinite(rawAccuracy) ? Number(rawAccuracy.toFixed(2)) : 0,
+        yearWiseStudents: toYearWiseStudents(studentStats.byYear || {}),
+        performanceDistribution: normalizeDistribution(institutionStats.performance_distribution || {})
       });
       setError('');
     } catch (error) {
@@ -304,8 +340,15 @@ const DashboardOverview = () => {
         totalStudents: studentsData.length,
         totalFaculty: facultyData.length,
         totalUsers: usersData.length,
-        mlAccuracy: 85.5,
-        yearWiseStudents: yearWiseCounts
+        mlAccuracy: 0,
+        yearWiseStudents: yearWiseCounts,
+        performanceDistribution: {
+          excellent: 0,
+          very_good: 0,
+          good: 0,
+          average: 0,
+          below_average: 0
+        }
       });
       setError('');
     } catch (error) {
@@ -316,14 +359,21 @@ const DashboardOverview = () => {
   };
 
   const performanceData = {
-    labels: ['Excellent', 'Good', 'Average', 'Poor'],
+    labels: ['Excellent', 'Very Good', 'Good', 'Average', 'Below Average'],
     datasets: [
       {
         label: 'Student Performance Distribution',
-        data: [25, 45, 20, 10],
+        data: [
+          stats.performanceDistribution?.excellent || 0,
+          stats.performanceDistribution?.very_good || 0,
+          stats.performanceDistribution?.good || 0,
+          stats.performanceDistribution?.average || 0,
+          stats.performanceDistribution?.below_average || 0
+        ],
         backgroundColor: [
           '#27ae60',
           '#3498db',
+          '#16a085',
           '#f39c12',
           '#e74c3c'
         ],
@@ -508,6 +558,12 @@ const DataManagement = () => {
       fetchData();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (uploadType === 'students' || uploadType === 'faculty') {
+      setActiveTab(uploadType);
+    }
+  }, [uploadType]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -1054,6 +1110,30 @@ const DataManagement = () => {
       <div className="quick-actions-section">
         <h3>Quick Actions</h3>
         <div className="quick-actions-grid">
+          <button
+            className={`quick-action-btn ${activeTab === 'students' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('students');
+              setUploadType('students');
+              setQuickActionStatus('[OK] Switched to Students tab');
+              setTimeout(() => setQuickActionStatus(''), 2000);
+            }}
+          >
+            <span className="action-icon"><FaGraduationCap /></span>
+            <span>Students Tab</span>
+          </button>
+          <button
+            className={`quick-action-btn ${activeTab === 'faculty' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveTab('faculty');
+              setUploadType('faculty');
+              setQuickActionStatus('[OK] Switched to Faculty tab');
+              setTimeout(() => setQuickActionStatus(''), 2000);
+            }}
+          >
+            <span className="action-icon"><FaChalkboardTeacher /></span>
+            <span>Faculty Tab</span>
+          </button>
           <button 
             className="quick-action-btn"
             onClick={() => setShowReportsModal(true)}
@@ -1266,6 +1346,137 @@ const DataManagement = () => {
             ) : null}
           </div>
         </div>
+      </div>
+
+      {/* Students/Faculty Data View */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title"><FaClipboardList /> {activeTab === 'students' ? 'Students Records' : 'Faculty Records'}</h2>
+        </div>
+
+        <div className="upload-controls" style={{ marginBottom: '1rem' }}>
+          <button
+            className={`btn ${activeTab === 'students' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => {
+              setActiveTab('students');
+              setUploadType('students');
+            }}
+          >
+            <FaGraduationCap /> Students
+          </button>
+          <button
+            className={`btn ${activeTab === 'faculty' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => {
+              setActiveTab('faculty');
+              setUploadType('faculty');
+            }}
+          >
+            <FaChalkboardTeacher /> Faculty
+          </button>
+          <button onClick={fetchData} className="btn btn-primary">
+            <FaSyncAlt /> Refresh
+          </button>
+          <button onClick={handleAddNew} className="btn btn-success">
+            <FaPlus /> Add New
+          </button>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <div className="spinner"></div>
+            Loading records...
+          </div>
+        ) : error ? (
+          <div className="alert alert-error">{error}</div>
+        ) : (
+          <div className="table-responsive">
+            {activeTab === 'students' ? (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>PRN</th>
+                    <th>Roll No</th>
+                    <th>Name</th>
+                    <th>Year</th>
+                    <th>Branch</th>
+                    <th>Division</th>
+                    <th>Email</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.length > 0 ? (
+                    students.map((record) => (
+                      <tr key={record._id || record.prn}>
+                        <td>{record.prn}</td>
+                        <td>{record.rollNo}</td>
+                        <td>{record.studentName}</td>
+                        <td>{record.year}</td>
+                        <td>{record.branch}</td>
+                        <td>{record.division}</td>
+                        <td>{record.email}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button className="btn btn-primary btn-sm" onClick={() => handleEdit(record)}>
+                              <FaEdit /> Edit
+                            </button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(record)}>
+                              <FaTrash /> Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '1rem' }}>No student records found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Faculty ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {faculty.length > 0 ? (
+                    faculty.map((record) => (
+                      <tr key={record._id || record.facultyId}>
+                        <td>{record.facultyId}</td>
+                        <td>{record.facultyName}</td>
+                        <td>{record.email}</td>
+                        <td>{record.department}</td>
+                        <td>{record.designation}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button className="btn btn-primary btn-sm" onClick={() => handleEdit(record)}>
+                              <FaEdit /> Edit
+                            </button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(record)}>
+                              <FaTrash /> Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '1rem' }}>No faculty records found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Edit/Create Modal */}
@@ -2000,6 +2211,85 @@ const MLModelControl = () => {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
 
+  const classSummary = classStats?.statistics || {};
+  const atRiskSummary = {
+    total: Number(atRisk?.total_at_risk || 0),
+    critical: Array.isArray(atRisk?.critical_risk_students) ? atRisk.critical_risk_students.length : 0,
+    high: Array.isArray(atRisk?.high_risk_students) ? atRisk.high_risk_students.length : 0
+  };
+  const subjectSummary = subjectStats?.statistics || {};
+
+  const classDistributionData = {
+    labels: ['Excellent', 'Very Good', 'Good', 'Average', 'Below Average'],
+    datasets: [
+      {
+        label: 'Performance Distribution',
+        data: [
+          Number(classSummary?.performance_distribution?.excellent || 0),
+          Number(classSummary?.performance_distribution?.very_good || 0),
+          Number(classSummary?.performance_distribution?.good || 0),
+          Number(classSummary?.performance_distribution?.average || 0),
+          Number(classSummary?.performance_distribution?.below_average || 0)
+        ],
+        backgroundColor: ['#27ae60', '#3498db', '#16a085', '#f39c12', '#e74c3c'],
+        borderWidth: 1
+      }
+    ]
+  };
+
+  const classAverageData = {
+    labels: ['Avg CGPA', 'Avg Attendance', 'Avg Perf Score', 'Avg Placement %'],
+    datasets: [
+      {
+        label: 'Class Averages',
+        data: [
+          Number(classSummary?.average_cgpa || 0),
+          Number(classSummary?.average_attendance || 0),
+          Number(classSummary?.average_performance_score || 0),
+          Number(classSummary?.average_placement_probability || 0)
+        ],
+        backgroundColor: ['#2980b9', '#27ae60', '#8e44ad', '#f39c12']
+      }
+    ]
+  };
+
+  const atRiskChartData = {
+    labels: ['Critical Risk', 'High Risk'],
+    datasets: [
+      {
+        data: [atRiskSummary.critical, atRiskSummary.high],
+        backgroundColor: ['#c0392b', '#d35400'],
+        borderWidth: 1
+      }
+    ]
+  };
+
+  const subjectMarksData = {
+    labels: ['Average', 'Highest', 'Lowest'],
+    datasets: [
+      {
+        label: 'Marks',
+        data: [
+          Number(subjectSummary?.average_marks || 0),
+          Number(subjectSummary?.highest_marks || 0),
+          Number(subjectSummary?.lowest_marks || 0)
+        ],
+        backgroundColor: ['#3498db', '#27ae60', '#e67e22']
+      }
+    ]
+  };
+
+  const subjectGradesData = {
+    labels: Object.keys(subjectSummary?.grade_distribution || {}),
+    datasets: [
+      {
+        label: 'Grade Count',
+        data: Object.values(subjectSummary?.grade_distribution || {}).map((v) => Number(v || 0)),
+        backgroundColor: ['#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#f39c12', '#e74c3c', '#7f8c8d']
+      }
+    ]
+  };
+
   const normalizeScope = () => ({
     year: analysisFilters.year && analysisFilters.year !== 'All' ? analysisFilters.year : undefined,
     branch: analysisFilters.branch || undefined,
@@ -2073,10 +2363,12 @@ const MLModelControl = () => {
         features: Array.isArray(features) ? features.length : 0,
         lastTrained: res.data?.last_trained || new Date().toLocaleString()
       });
+      window.dispatchEvent(new Event('ml-model-updated'));
       setAnalysisError('');
     } catch (e) {
       setModelStatus('Not Trained');
-      setAnalysisError(e.response?.data?.error || e.message);
+      const backendError = e.response?.data?.error || e.response?.data?.details || e.response?.data?.message || e.message;
+      setAnalysisError(`Training failed: ${backendError}`);
     }
   };
 
@@ -2098,6 +2390,7 @@ const MLModelControl = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       await refreshModelInfo();
+      window.dispatchEvent(new Event('ml-model-updated'));
       alert('Model loaded successfully.');
     } catch (error) {
       setAnalysisError(error.response?.data?.error || error.message);
@@ -2296,6 +2589,26 @@ const MLModelControl = () => {
                 />
               </div>
             </div>
+
+            {/* Live Summary Cards (non-static) */}
+            <div className="metrics-grid" style={{ marginTop: '1rem' }}>
+              <div className="metric-card">
+                <h3>Class Avg Performance</h3>
+                <div className="metric-value">{Number(classSummary.average_performance_score || 0).toFixed(2)}</div>
+              </div>
+              <div className="metric-card">
+                <h3>Total At-Risk</h3>
+                <div className="metric-value">{atRiskSummary.total}</div>
+              </div>
+              <div className="metric-card">
+                <h3>Critical Risk</h3>
+                <div className="metric-value">{atRiskSummary.critical}</div>
+              </div>
+              <div className="metric-card">
+                <h3>Subject Avg Marks</h3>
+                <div className="metric-value">{Number(subjectSummary.average_marks || 0).toFixed(2)}</div>
+              </div>
+            </div>
             <div className="analysis-actions">
               <button className="btn btn-primary" onClick={async () => {
                 try {
@@ -2370,7 +2683,32 @@ const MLModelControl = () => {
                 {classStats && (
                   <div className="output-block">
                     <h3>Class Statistics</h3>
-                    <pre>{JSON.stringify(classStats.statistics, null, 2)}</pre>
+                    <div className="output-grid" style={{ marginBottom: '0.5rem' }}>
+                      <div><strong>Total Students:</strong> {classSummary.total_students ?? 0}</div>
+                      <div><strong>Avg CGPA:</strong> {classSummary.average_cgpa ?? 0}</div>
+                      <div><strong>Avg Attendance:</strong> {classSummary.average_attendance ?? 0}</div>
+                      <div><strong>At Risk:</strong> {classSummary.students_at_risk ?? 0}</div>
+                    </div>
+                    <div className="charts-grid">
+                      <div className="chart-card">
+                        <h4>Performance Distribution</h4>
+                        <div className="chart-container">
+                          <Doughnut
+                            data={classDistributionData}
+                            options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
+                          />
+                        </div>
+                      </div>
+                      <div className="chart-card">
+                        <h4>Class Averages</h4>
+                        <div className="chart-container">
+                          <Bar
+                            data={classAverageData}
+                            options={{ responsive: true, plugins: { legend: { display: false } } }}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -2378,7 +2716,45 @@ const MLModelControl = () => {
                 {atRisk && (
                   <div className="output-block">
                     <h3>At-Risk Students</h3>
-                    <pre>{JSON.stringify(atRisk, null, 2)}</pre>
+                    <div className="output-grid" style={{ marginBottom: '0.5rem' }}>
+                      <div><strong>Total:</strong> {atRiskSummary.total}</div>
+                      <div><strong>Critical:</strong> {atRiskSummary.critical}</div>
+                      <div><strong>High:</strong> {atRiskSummary.high}</div>
+                    </div>
+                    <div className="charts-grid">
+                      <div className="chart-card">
+                        <h4>Risk Severity Split</h4>
+                        <div className="chart-container">
+                          <Doughnut
+                            data={atRiskChartData}
+                            options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
+                          />
+                        </div>
+                      </div>
+                      <div className="chart-card">
+                        <h4>Top Critical Students</h4>
+                        <div className="table-responsive">
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>Name</th>
+                                <th>PRN</th>
+                                <th>Score</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(atRisk?.critical_risk_students || []).slice(0, 5).map((s) => (
+                                <tr key={s.prn || s.roll_no}>
+                                  <td>{s.name}</td>
+                                  <td>{s.prn || '-'}</td>
+                                  <td>{s.performance_score ?? '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -2386,7 +2762,36 @@ const MLModelControl = () => {
                 {subjectStats && (
                   <div className="output-block">
                     <h3>Subject Analysis ({subjectStats.subject_name})</h3>
-                    <pre>{JSON.stringify(subjectStats.statistics, null, 2)}</pre>
+                    <div className="output-grid" style={{ marginBottom: '0.5rem' }}>
+                      <div><strong>Total Students:</strong> {subjectSummary.total_students ?? 0}</div>
+                      <div><strong>Average Marks:</strong> {subjectSummary.average_marks ?? 0}</div>
+                      <div><strong>Highest:</strong> {subjectSummary.highest_marks ?? 0}</div>
+                      <div><strong>Lowest:</strong> {subjectSummary.lowest_marks ?? 0}</div>
+                    </div>
+                    <div className="charts-grid">
+                      <div className="chart-card">
+                        <h4>Marks Summary</h4>
+                        <div className="chart-container">
+                          <Bar
+                            data={subjectMarksData}
+                            options={{ responsive: true, plugins: { legend: { display: false } } }}
+                          />
+                        </div>
+                      </div>
+                      <div className="chart-card">
+                        <h4>Grade Distribution</h4>
+                        <div className="chart-container">
+                          {subjectGradesData.labels.length > 0 ? (
+                            <Doughnut
+                              data={subjectGradesData}
+                              options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
+                            />
+                          ) : (
+                            <div style={{ color: 'var(--muted)' }}>No grade distribution data available.</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </>
