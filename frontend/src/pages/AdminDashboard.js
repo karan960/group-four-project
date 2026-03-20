@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -26,13 +26,15 @@ import {
   FaBook, FaTrash, FaBroom, FaCheckCircle, FaExclamationCircle, FaUser,
   FaDoorOpen, FaCompass, FaLightbulb, FaSave, FaBolt, FaRocket,
   FaTools, FaTimesCircle, FaBullseye, FaBrain, FaChartBar,
-  FaExclamationTriangle, FaBars, FaChevronLeft, FaHome, FaCalendar,
+  FaExclamationTriangle, FaBars, FaChevronLeft, FaHome, FaCalendar, FaBriefcase,
   FaEdit
 } from 'react-icons/fa';
 import './AdminDashboard.css';
 
 const localStorage = window.sessionStorage;
 const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
+const AUTH_API_BASE_URL = process.env.REACT_APP_AUTH_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
+const AUTH_API_FALLBACK_BASE_URL = `${window.location.protocol}//${window.location.hostname}:5000`;
 
 // Register ChartJS components
 ChartJS.register(
@@ -49,10 +51,15 @@ ChartJS.register(
 
 // Profile Dropdown Component
 const ProfileDropdown = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfilePhoto } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileData, setProfileData] = useState({});
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef(null);
+  const avatarSrc = user?.profilePhoto
+    ? `${AUTH_API_FALLBACK_BASE_URL}${user.profilePhoto}`
+    : '';
 
   useEffect(() => {
     if (user) {
@@ -79,6 +86,54 @@ const ProfileDropdown = () => {
     }
   };
 
+  const handlePhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('profilePhoto', file);
+
+    try {
+      setUploadingPhoto(true);
+      const token = localStorage.getItem('token');
+      const baseCandidates = [...new Set([AUTH_API_BASE_URL, AUTH_API_FALLBACK_BASE_URL, 'http://localhost:5000'])];
+      let response = null;
+      let lastError = null;
+
+      for (const baseUrl of baseCandidates) {
+        try {
+          response = await axios.put(
+            `${baseUrl}/api/auth/profile-photo`,
+            formData,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'multipart/form-data'
+              }
+            }
+          );
+          break;
+        } catch (error) {
+          lastError = error;
+          if (error?.response?.status !== 404) {
+            throw error;
+          }
+        }
+      }
+
+      if (!response) {
+        throw lastError || new Error('Profile photo upload failed');
+      }
+
+      updateProfilePhoto(response.data?.profilePhoto || '');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to upload profile photo');
+    } finally {
+      setUploadingPhoto(false);
+      event.target.value = '';
+    }
+  };
+
   return (
     <div className="profile-dropdown">
       <div 
@@ -86,7 +141,11 @@ const ProfileDropdown = () => {
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="profile-avatar">
-          {user?.username?.charAt(0).toUpperCase()}
+          {avatarSrc ? (
+            <img src={avatarSrc} alt="Profile" />
+          ) : (
+            user?.username?.charAt(0).toUpperCase()
+          )}
         </div>
       </div>
 
@@ -94,7 +153,11 @@ const ProfileDropdown = () => {
         <div className="profile-menu">
           <div className="profile-header">
             <div className="profile-avatar large">
-              {user?.username?.charAt(0).toUpperCase()}
+              {avatarSrc ? (
+                <img src={avatarSrc} alt="Profile" />
+              ) : (
+                user?.username?.charAt(0).toUpperCase()
+              )}
             </div>
             <div className="profile-info">
               <h4>{user?.username}</h4>
@@ -104,6 +167,20 @@ const ProfileDropdown = () => {
           </div>
           
           <div className="profile-actions">
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              style={{ display: 'none' }}
+              onChange={handlePhotoUpload}
+            />
+            <button
+              onClick={() => photoInputRef.current?.click()}
+              className="profile-btn"
+              disabled={uploadingPhoto}
+            >
+              <FaEdit /> {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+            </button>
             <button 
               onClick={() => setShowProfileModal(true)}
               className="profile-btn"
@@ -1790,6 +1867,481 @@ const DataManagement = () => {
   );
 };
 
+const PlacementManagement = () => {
+  const [yearFilter, setYearFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [students, setStudents] = useState([]);
+  const [yearSummary, setYearSummary] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showcaseError, setShowcaseError] = useState('');
+  const [editingPlacement, setEditingPlacement] = useState(null);
+  const [placementForm, setPlacementForm] = useState({
+    placementStatus: 'Not Eligible',
+    companyName: '',
+    package: '',
+    offerLetterDate: ''
+  });
+  const [showcaseEntries, setShowcaseEntries] = useState([]);
+  const [showcaseLoading, setShowcaseLoading] = useState(false);
+  const [editingShowcaseId, setEditingShowcaseId] = useState('');
+  const [showcaseForm, setShowcaseForm] = useState({
+    studentName: '',
+    year: 'Fourth',
+    branch: '',
+    companyName: '',
+    role: '',
+    packageLpa: '',
+    placedYear: new Date().getFullYear(),
+    note: ''
+  });
+
+  const fetchPlacements = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/students/placements`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          year: yearFilter || undefined,
+          placementStatus: statusFilter || undefined,
+          search: search || undefined
+        }
+      });
+
+      setStudents(Array.isArray(response.data?.students) ? response.data.students : []);
+      setYearSummary(response.data?.yearWiseSummary || {});
+    } catch (fetchError) {
+      setError(fetchError.response?.data?.message || fetchError.message);
+      setStudents([]);
+      setYearSummary({});
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPlacements();
+  }, [yearFilter, statusFilter]);
+
+  useEffect(() => {
+    fetchPlacementShowcase();
+  }, []);
+
+  const handleOpenPlacementEdit = (student) => {
+    setEditingPlacement(student);
+    setPlacementForm({
+      placementStatus: student.placementStatus || 'Not Eligible',
+      companyName: student.companyName || '',
+      package: student.package || '',
+      offerLetterDate: student.offerLetterDate ? new Date(student.offerLetterDate).toISOString().slice(0, 10) : ''
+    });
+  };
+
+  const handleSavePlacement = async () => {
+    if (!editingPlacement?.prn) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `${API_BASE_URL}/api/students/placements/${editingPlacement.prn}`,
+        placementForm,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setEditingPlacement(null);
+      await fetchPlacements();
+    } catch (saveError) {
+      setError(saveError.response?.data?.message || saveError.message);
+    }
+  };
+
+  const fetchPlacementShowcase = async () => {
+    try {
+      setShowcaseLoading(true);
+      setShowcaseError('');
+      const token = localStorage.getItem('token');
+      let response;
+      try {
+        response = await axios.get(`${API_BASE_URL}/api/placement-showcase`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { limit: 100 }
+        });
+      } catch (primaryError) {
+        response = await axios.get(`${API_BASE_URL}/api/placements/showcase`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: { limit: 100 }
+        });
+      }
+      setShowcaseEntries(Array.isArray(response.data?.placements) ? response.data.placements : []);
+    } catch (showcaseError) {
+      if (showcaseError.response?.status === 404) {
+        // Backward compatibility: keep placement management functional even if showcase API is unavailable.
+        setShowcaseEntries([]);
+        setShowcaseError('Past placement showcase service is not available on current backend build.');
+      } else {
+        setShowcaseError(showcaseError.response?.data?.message || showcaseError.message);
+      }
+      setShowcaseEntries([]);
+    } finally {
+      setShowcaseLoading(false);
+    }
+  };
+
+  const resetShowcaseForm = () => {
+    setEditingShowcaseId('');
+    setShowcaseForm({
+      studentName: '',
+      year: 'Fourth',
+      branch: '',
+      companyName: '',
+      role: '',
+      packageLpa: '',
+      placedYear: new Date().getFullYear(),
+      note: ''
+    });
+  };
+
+  const handleSaveShowcase = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      setShowcaseError('');
+      const payload = {
+        ...showcaseForm,
+        packageLpa: showcaseForm.packageLpa === '' ? null : Number(showcaseForm.packageLpa),
+        placedYear: Number(showcaseForm.placedYear)
+      };
+
+      if (editingShowcaseId) {
+        try {
+          await axios.put(`${API_BASE_URL}/api/placement-showcase/${editingShowcaseId}`, payload, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        } catch (primaryError) {
+          await axios.put(`${API_BASE_URL}/api/placements/showcase/${editingShowcaseId}`, payload, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        }
+      } else {
+        try {
+          await axios.post(`${API_BASE_URL}/api/placement-showcase`, payload, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        } catch (primaryError) {
+          await axios.post(`${API_BASE_URL}/api/placements/showcase`, payload, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        }
+      }
+
+      resetShowcaseForm();
+      await fetchPlacementShowcase();
+    } catch (saveError) {
+      setShowcaseError(saveError.response?.data?.message || saveError.message);
+    }
+  };
+
+  const handleEditShowcase = (entry) => {
+    setEditingShowcaseId(entry._id);
+    setShowcaseForm({
+      studentName: entry.studentName || '',
+      year: entry.year || 'Fourth',
+      branch: entry.branch || '',
+      companyName: entry.companyName || '',
+      role: entry.role || '',
+      packageLpa: entry.packageLpa ?? '',
+      placedYear: entry.placedYear || new Date().getFullYear(),
+      note: entry.note || ''
+    });
+  };
+
+  const handleDeleteShowcase = async (entryId) => {
+    try {
+      const token = localStorage.getItem('token');
+      setShowcaseError('');
+      try {
+        await axios.delete(`${API_BASE_URL}/api/placement-showcase/${entryId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (primaryError) {
+        await axios.delete(`${API_BASE_URL}/api/placements/showcase/${entryId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+      await fetchPlacementShowcase();
+    } catch (deleteError) {
+      setShowcaseError(deleteError.response?.data?.message || deleteError.message);
+    }
+  };
+
+  return (
+    <div>
+      <div className="section-header">
+        <h1>Placement Management</h1>
+        <p>Update placed student company details with year-wise filtering and visibility across all dashboards</p>
+      </div>
+
+      {error && <div className="alert alert-error">{error}</div>}
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-header">
+          <h2 className="card-title"><FaChartBar /> Year-wise Placement Summary</h2>
+        </div>
+        <div className="card-body">
+          <div className="stats-grid">
+            {Object.keys(yearSummary).length === 0 ? (
+              <p style={{ color: 'var(--muted)' }}>No placement summary available.</p>
+            ) : (
+              Object.entries(yearSummary).map(([year, summary]) => (
+                <div className="stat-card" key={year}>
+                  <div className="stat-icon"><FaGraduationCap /></div>
+                  <div className="stat-info">
+                    <h3>{year}</h3>
+                    <p>Total: {summary.total} | Placed: {summary.placed}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-header">
+          <h2 className="card-title"><FaBriefcase /> Past Placed Students Showcase</h2>
+        </div>
+        <div className="card-body">
+          {showcaseError && <div className="alert alert-warning" style={{ marginBottom: '1rem' }}>{showcaseError}</div>}
+          <div className="form-grid" style={{ marginBottom: '1rem' }}>
+            <div className="form-group">
+              <label>Student Name *</label>
+              <input className="form-control" value={showcaseForm.studentName} onChange={(e) => setShowcaseForm({ ...showcaseForm, studentName: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label>Year *</label>
+              <select className="form-control" value={showcaseForm.year} onChange={(e) => setShowcaseForm({ ...showcaseForm, year: e.target.value })}>
+                <option value="First">First</option>
+                <option value="Second">Second</option>
+                <option value="Third">Third</option>
+                <option value="Fourth">Fourth</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Branch *</label>
+              <input className="form-control" value={showcaseForm.branch} onChange={(e) => setShowcaseForm({ ...showcaseForm, branch: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label>Company *</label>
+              <input className="form-control" value={showcaseForm.companyName} onChange={(e) => setShowcaseForm({ ...showcaseForm, companyName: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label>Role</label>
+              <input className="form-control" value={showcaseForm.role} onChange={(e) => setShowcaseForm({ ...showcaseForm, role: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label>Package (LPA)</label>
+              <input className="form-control" type="number" value={showcaseForm.packageLpa} onChange={(e) => setShowcaseForm({ ...showcaseForm, packageLpa: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label>Placed Year *</label>
+              <input className="form-control" type="number" value={showcaseForm.placedYear} onChange={(e) => setShowcaseForm({ ...showcaseForm, placedYear: e.target.value })} />
+            </div>
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+              <label>Note</label>
+              <input className="form-control" value={showcaseForm.note} onChange={(e) => setShowcaseForm({ ...showcaseForm, note: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="upload-controls" style={{ marginBottom: '1rem' }}>
+            <button className="btn btn-success" onClick={handleSaveShowcase}>{editingShowcaseId ? 'Update Entry' : 'Add Entry'}</button>
+            {editingShowcaseId && <button className="btn btn-secondary" onClick={resetShowcaseForm}>Cancel Edit</button>}
+          </div>
+
+          {showcaseLoading ? (
+            <div style={{ textAlign: 'center', padding: '1rem' }}><div className="spinner"></div></div>
+          ) : (
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Year</th>
+                    <th>Branch</th>
+                    <th>Company</th>
+                    <th>Role</th>
+                    <th>Package</th>
+                    <th>Placed Year</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {showcaseEntries.length === 0 ? (
+                    <tr><td colSpan="8" style={{ textAlign: 'center', padding: '1rem' }}>No past placement entries yet.</td></tr>
+                  ) : showcaseEntries.map((entry) => (
+                    <tr key={entry._id}>
+                      <td>{entry.studentName}</td>
+                      <td>{entry.year}</td>
+                      <td>{entry.branch}</td>
+                      <td>{entry.companyName}</td>
+                      <td>{entry.role || '-'}</td>
+                      <td>{entry.packageLpa ?? '-'}</td>
+                      <td>{entry.placedYear}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button className="btn btn-primary btn-sm" onClick={() => handleEditShowcase(entry)}><FaEdit /> Edit</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDeleteShowcase(entry._id)}><FaTrash /> Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title"><FaBriefcase /> Placement Records</h2>
+        </div>
+        <div className="card-body">
+          <div className="upload-controls" style={{ marginBottom: '1rem' }}>
+            <select className="form-control" value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+              <option value="">All Years</option>
+              <option value="First">First</option>
+              <option value="Second">Second</option>
+              <option value="Third">Third</option>
+              <option value="Fourth">Fourth</option>
+            </select>
+            <select className="form-control" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">All Status</option>
+              <option value="Not Eligible">Not Eligible</option>
+              <option value="Eligible">Eligible</option>
+              <option value="Placed">Placed</option>
+              <option value="Higher Studies">Higher Studies</option>
+            </select>
+            <input
+              className="form-control"
+              placeholder="Search by PRN / student / company"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <button className="btn btn-primary" onClick={fetchPlacements}>Search</button>
+          </div>
+
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '1rem' }}>
+              <div className="spinner"></div>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>PRN</th>
+                    <th>Year</th>
+                    <th>Branch</th>
+                    <th>Status</th>
+                    <th>Company</th>
+                    <th>Package (LPA)</th>
+                    <th>Offer Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" style={{ textAlign: 'center', padding: '1rem' }}>No records found.</td>
+                    </tr>
+                  ) : (
+                    students.map((student) => (
+                      <tr key={student.prn}>
+                        <td>{student.studentName}</td>
+                        <td>{student.prn}</td>
+                        <td>{student.year}</td>
+                        <td>{student.branch}</td>
+                        <td>{student.placementStatus || 'Not Eligible'}</td>
+                        <td>{student.companyName || '-'}</td>
+                        <td>{student.package ?? '-'}</td>
+                        <td>{student.offerLetterDate ? new Date(student.offerLetterDate).toLocaleDateString() : '-'}</td>
+                        <td>
+                          <button className="btn btn-primary btn-sm" onClick={() => handleOpenPlacementEdit(student)}>
+                            <FaEdit /> Update
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {editingPlacement && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h3>Update Placement - {editingPlacement.studentName}</h3>
+              <button onClick={() => setEditingPlacement(null)} className="btn-close">×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Status</label>
+                  <select
+                    value={placementForm.placementStatus}
+                    onChange={(e) => setPlacementForm({ ...placementForm, placementStatus: e.target.value })}
+                  >
+                    <option value="Not Eligible">Not Eligible</option>
+                    <option value="Eligible">Eligible</option>
+                    <option value="Placed">Placed</option>
+                    <option value="Higher Studies">Higher Studies</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Company Name</label>
+                  <input
+                    type="text"
+                    value={placementForm.companyName}
+                    onChange={(e) => setPlacementForm({ ...placementForm, companyName: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Package (LPA)</label>
+                  <input
+                    type="number"
+                    value={placementForm.package}
+                    onChange={(e) => setPlacementForm({ ...placementForm, package: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Offer Date</label>
+                  <input
+                    type="date"
+                    value={placementForm.offerLetterDate}
+                    onChange={(e) => setPlacementForm({ ...placementForm, offerLetterDate: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setEditingPlacement(null)}>Cancel</button>
+              <button className="btn btn-success" onClick={handleSavePlacement}>Save Placement</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // DatabaseManagement Component
 const DatabaseManagement = () => {
   const [tables, setTables] = useState([]);
@@ -3119,6 +3671,7 @@ const AdminDashboard = () => {
     { path: '/admin', label: 'Dashboard', icon: <FaTachometerAlt />, component: DashboardOverview },
     { path: '/admin/data', label: 'Data Display', icon: <FaChartLine />, component: DataDisplay },
     { path: '/admin/manage', label: 'Data Management', icon: <FaDatabase />, component: DataManagement },
+    { path: '/admin/placements', label: 'Placements', icon: <FaBriefcase />, component: PlacementManagement },
     { path: '/admin/timetable', label: 'Timetable', icon: <FaCalendar />, component: AdminTimetableManager },
     { path: '/admin/ml', label: 'ML Model', icon: <FaRobot />, component: MLModelControl },
     { path: '/admin/users', label: 'User Management', icon: <FaUsers />, component: UserManagement },

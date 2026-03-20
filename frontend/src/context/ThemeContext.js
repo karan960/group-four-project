@@ -3,16 +3,25 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 const ThemeContext = createContext();
 const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
 
+const getSystemTheme = () => (
+  window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light'
+);
+
+const normalizeTheme = (value) => {
+  if (value === 'dark' || value === 'light') return value;
+  if (value === 'system') return getSystemTheme();
+  return null;
+};
+
 export const useTheme = () => useContext(ThemeContext);
 
 export const ThemeProvider = ({ children }) => {
   const getInitial = () => {
     const saved = localStorage.getItem('theme');
-    if (saved) return saved;
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
-    return 'light';
+    const normalized = normalizeTheme(saved);
+    return normalized || getSystemTheme();
   };
 
   const [theme, setTheme] = useState(getInitial);
@@ -48,9 +57,12 @@ export const ThemeProvider = ({ children }) => {
         if (!res.ok) return;
         const data = await res.json();
         if (data?.theme) {
-          // if server has a preference, use it (and persist locally)
-          setTheme(data.theme === 'system' ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : data.theme);
-          try { localStorage.setItem('theme', data.theme); } catch (e) {}
+          // Keep only explicit dark/light in local state and storage.
+          const resolvedTheme = normalizeTheme(data.theme);
+          if (resolvedTheme) {
+            setTheme(resolvedTheme);
+            try { localStorage.setItem('theme', resolvedTheme); } catch (e) {}
+          }
         }
       } catch (e) {
         // network error - ignore and rely on local preference
@@ -60,7 +72,9 @@ export const ThemeProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    const isDark = theme === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
+    document.body.classList.toggle('dark', isDark);
     try {
       localStorage.setItem('theme', theme);
     } catch (e) {
@@ -78,8 +92,8 @@ export const ThemeProvider = ({ children }) => {
   };
 
   const set = (value) => {
-    setTheme((t) => {
-      const next = value;
+    setTheme(() => {
+      const next = normalizeTheme(value) || 'light';
       saveThemeToServer(next);
       return next;
     });

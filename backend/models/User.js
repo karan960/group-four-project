@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema({
   plainPassword: { type: String }, // Store original password for admin display
   role: { type: String, enum: ['student', 'faculty', 'admin'], required: true },
   referenceId: { type: String, required: true },
+  profilePhoto: { type: String, default: '' },
   // theme preference: client can set to 'light', 'dark' or 'system'
   theme: { type: String, enum: ['light', 'dark', 'system'], default: 'light' },
   isActive: { type: Boolean, default: true },

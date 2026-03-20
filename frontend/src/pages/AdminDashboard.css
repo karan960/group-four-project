@@ -291,11 +291,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   color: white;
   font-weight: 700;
   font-size: 1.2rem;
   box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
   border: 3px solid white;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .profile-avatar.large {

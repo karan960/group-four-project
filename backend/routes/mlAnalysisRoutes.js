@@ -9,6 +9,10 @@ const ML_API_URL = RAW_ML_API_URL.includes('/api/ml/performance')
   ? RAW_ML_API_URL.replace(/\/$/, '')
   : `${RAW_ML_API_URL.replace(/\/$/, '')}/api/ml/performance`;
 
+const FULL_ANALYSIS_CACHE_TTL_MS = Number(process.env.FULL_ANALYSIS_CACHE_TTL_MS || 5 * 60 * 1000);
+const fullStudentAnalysisCache = new Map();
+const fullStudentAnalysisInFlight = new Map();
+
 const buildStudentQuery = ({ year, branch, division }) => {
   const query = { isActive: true };
   if (year) query.year = year;
@@ -44,6 +48,42 @@ const formatStudentData = (student) => {
     branch: student.branch,
     division: student.division
   };
+};
+
+const getStatusFromStudentSnapshot = (student) => {
+  const cgpa = Number(student?.cgpa || 0);
+  const attendance = Number(student?.overallAttendance || 0);
+  const backlogCount = Number(student?.backlogs || 0);
+
+  if (cgpa >= 8.5 && attendance >= 85 && backlogCount === 0) {
+    return { status: 'Excellent', riskLevel: 'Low Risk' };
+  }
+  if (cgpa >= 7 && attendance >= 75 && backlogCount <= 1) {
+    return { status: 'Good', riskLevel: 'Medium Risk' };
+  }
+  if (cgpa >= 6 && attendance >= 65) {
+    return { status: 'Average', riskLevel: 'Medium Risk' };
+  }
+  return { status: 'Needs Attention', riskLevel: 'High Risk' };
+};
+
+const getCachedFullStudentAnalysis = (studentId) => {
+  const cached = fullStudentAnalysisCache.get(studentId);
+  if (!cached) return null;
+
+  if (cached.expiresAt <= Date.now()) {
+    fullStudentAnalysisCache.delete(studentId);
+    return null;
+  }
+
+  return cached.payload;
+};
+
+const setCachedFullStudentAnalysis = (studentId, payload) => {
+  fullStudentAnalysisCache.set(studentId, {
+    expiresAt: Date.now() + Math.max(1000, FULL_ANALYSIS_CACHE_TTL_MS),
+    payload
+  });
 };
 
 // ==================== PERFORMANCE ANALYSIS ROUTES ====================
@@ -649,38 +689,23 @@ router.get('/faculty/:facultyId/students-analysis', async (req, res) => {
       return res.status(404).json({ error: 'No students found for this faculty scope' });
     }
 
-    const analyzedStudents = await Promise.all(
-      students.map(async (student) => {
-        const studentData = formatStudentData(student);
-        try {
-          const response = await axios.post(`${ML_API_URL}/individual/${student._id}`, studentData);
-          const perf = response.data?.performance || {};
-          return {
-            _id: student._id,
-            prn: student.prn,
-            studentName: student.studentName,
-            year: student.year,
-            division: student.division,
-            cgpa: student.cgpa || 0,
-            overallAttendance: student.overallAttendance || 0,
-            status: perf.performance_category || 'Average',
-            riskLevel: perf.risk_level || 'Medium Risk'
-          };
-        } catch (error) {
-          return {
-            _id: student._id,
-            prn: student.prn,
-            studentName: student.studentName,
-            year: student.year,
-            division: student.division,
-            cgpa: student.cgpa || 0,
-            overallAttendance: student.overallAttendance || 0,
-            status: 'Analysis Pending',
-            riskLevel: 'Unknown'
-          };
-        }
-      })
-    );
+    const analyzedStudents = students.map((student) => {
+      const { status, riskLevel } = getStatusFromStudentSnapshot(student);
+      return {
+        _id: student._id,
+        prn: student.prn,
+        studentName: student.studentName,
+        year: student.year,
+        division: student.division,
+        cgpa: student.cgpa || 0,
+        overallAttendance: student.overallAttendance || 0,
+        placementStatus: student.placementStatus || 'Not Eligible',
+        companyName: student.companyName || '',
+        package: student.package || null,
+        status,
+        riskLevel
+      };
+    });
 
     res.json({
       success: true,
@@ -708,33 +733,66 @@ router.get('/faculty/:facultyId/students-analysis', async (req, res) => {
 router.get('/student/:studentId/full-analysis', async (req, res) => {
   try {
     const { studentId } = req.params;
-    const student = await Student.findById(studentId);
 
-    if (!student) {
-      return res.status(404).json({ error: 'Student not found' });
+    const cached = getCachedFullStudentAnalysis(studentId);
+    if (cached) {
+      return res.json(cached);
     }
 
-    const studentData = formatStudentData(student);
-    const [individual, subjects, improvement] = await Promise.all([
-      axios.post(`${ML_API_URL}/individual/${studentId}`, studentData),
-      axios.post(`${ML_API_URL}/subject-wise/${studentId}`, studentData),
-      axios.post(`${ML_API_URL}/improvement-analysis/${studentId}`, studentData).catch(() => ({ data: null }))
-    ]);
+    if (fullStudentAnalysisInFlight.has(studentId)) {
+      const sharedPayload = await fullStudentAnalysisInFlight.get(studentId);
+      return res.json(sharedPayload);
+    }
 
-    res.json({
-      success: true,
-      student: {
-        _id: student._id,
-        prn: student.prn,
-        studentName: student.studentName,
-        year: student.year,
-        division: student.division
-      },
-      individual: individual.data,
-      subjects: subjects.data,
-      improvement: improvement?.data || null
-    });
+    const loadAnalysisPromise = (async () => {
+      const student = await Student.findById(studentId);
+
+      if (!student) {
+        const notFoundError = new Error('Student not found');
+        notFoundError.status = 404;
+        throw notFoundError;
+      }
+
+      const studentData = formatStudentData(student);
+      const [individual, subjects, improvement] = await Promise.all([
+        axios.post(`${ML_API_URL}/individual/${studentId}`, studentData),
+        axios.post(`${ML_API_URL}/subject-wise/${studentId}`, studentData),
+        axios.post(`${ML_API_URL}/improvement-analysis/${studentId}`, studentData).catch(() => ({ data: null }))
+      ]);
+
+      const payload = {
+        success: true,
+        student: {
+          _id: student._id,
+          prn: student.prn,
+          studentName: student.studentName,
+          year: student.year,
+          division: student.division,
+          placementStatus: student.placementStatus || 'Not Eligible',
+          companyName: student.companyName || '',
+          package: student.package || null,
+          offerLetterDate: student.offerLetterDate || null
+        },
+        individual: individual.data,
+        subjects: subjects.data,
+        improvement: improvement?.data || null
+      };
+
+      setCachedFullStudentAnalysis(studentId, payload);
+      return payload;
+    })();
+
+    fullStudentAnalysisInFlight.set(studentId, loadAnalysisPromise);
+    try {
+      const payload = await loadAnalysisPromise;
+      return res.json(payload);
+    } finally {
+      fullStudentAnalysisInFlight.delete(studentId);
+    }
   } catch (error) {
+    if (error?.status === 404) {
+      return res.status(404).json({ error: error.message });
+    }
     console.error('Error fetching full student analysis:', error.message);
     res.status(500).json({
       error: 'Failed to fetch full student analysis',

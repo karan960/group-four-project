@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -25,7 +25,10 @@ import {
 } from 'react-icons/fa';
 import './StudentDashboard.css';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;const localStorage = window.sessionStorage;
+const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
+const AUTH_API_BASE_URL = process.env.REACT_APP_AUTH_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
+const AUTH_API_FALLBACK_BASE_URL = `${window.location.protocol}//${window.location.hostname}:5000`;
+const localStorage = window.sessionStorage;
 
 // Register ChartJS components
 ChartJS.register(
@@ -42,8 +45,61 @@ ChartJS.register(
 
 // Profile Dropdown Component
 const ProfileDropdown = ({ onSettingsClick, onViewProfile }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfilePhoto } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef(null);
+  const avatarSrc = user?.profilePhoto
+    ? `${AUTH_API_FALLBACK_BASE_URL}${user.profilePhoto}`
+    : '';
+
+  const handlePhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('profilePhoto', file);
+
+    try {
+      setUploadingPhoto(true);
+      const token = localStorage.getItem('token');
+      const baseCandidates = [...new Set([AUTH_API_BASE_URL, AUTH_API_FALLBACK_BASE_URL, 'http://localhost:5000'])];
+      let response = null;
+      let lastError = null;
+
+      for (const baseUrl of baseCandidates) {
+        try {
+          response = await axios.put(
+            `${baseUrl}/api/auth/profile-photo`,
+            formData,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'multipart/form-data'
+              }
+            }
+          );
+          break;
+        } catch (error) {
+          lastError = error;
+          if (error?.response?.status !== 404) {
+            throw error;
+          }
+        }
+      }
+
+      if (!response) {
+        throw lastError || new Error('Profile photo upload failed');
+      }
+
+      updateProfilePhoto(response.data?.profilePhoto || '');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to upload profile photo');
+    } finally {
+      setUploadingPhoto(false);
+      event.target.value = '';
+    }
+  };
 
   return (
     <div className="profile-dropdown">
@@ -52,7 +108,11 @@ const ProfileDropdown = ({ onSettingsClick, onViewProfile }) => {
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="profile-avatar">
-          {user?.username?.charAt(0).toUpperCase()}
+          {avatarSrc ? (
+            <img src={avatarSrc} alt="Profile" />
+          ) : (
+            user?.username?.charAt(0).toUpperCase()
+          )}
         </div>
       </div>
 
@@ -60,7 +120,11 @@ const ProfileDropdown = ({ onSettingsClick, onViewProfile }) => {
         <div className="profile-menu">
           <div className="profile-header">
             <div className="profile-avatar large">
-              {user?.username?.charAt(0).toUpperCase()}
+              {avatarSrc ? (
+                <img src={avatarSrc} alt="Profile" />
+              ) : (
+                user?.username?.charAt(0).toUpperCase()
+              )}
             </div>
             <div className="profile-info">
               <h4>{user?.username}</h4>
@@ -70,6 +134,20 @@ const ProfileDropdown = ({ onSettingsClick, onViewProfile }) => {
           </div>
           
           <div className="profile-actions">
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              style={{ display: 'none' }}
+              onChange={handlePhotoUpload}
+            />
+            <button
+              className="profile-btn"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={uploadingPhoto}
+            >
+              <FaEdit /> {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+            </button>
             <button 
               className="profile-btn"
               onClick={() => {
@@ -126,6 +204,8 @@ const StudentDashboard = () => {
   const [lastPresenceRequest, setLastPresenceRequest] = useState(null);
   const [presenceSessionInfo, setPresenceSessionInfo] = useState(null);
   const [sendingPresenceRequest, setSendingPresenceRequest] = useState(false);
+  const [pastPlacements, setPastPlacements] = useState([]);
+  const [pastPlacementsLoading, setPastPlacementsLoading] = useState(false);
   
   // Settings Modal States
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -169,6 +249,9 @@ const StudentDashboard = () => {
     }
     if (activeTab === 'Schedule') {
       fetchStudentTimetable();
+    }
+    if (activeTab === 'Placements') {
+      fetchPastPlacements();
     }
   }, [activeTab]);
 
@@ -458,6 +541,23 @@ const StudentDashboard = () => {
       console.error('Error fetching assignments:', error);
     } finally {
       setAssignmentsLoading(false);
+    }
+  };
+
+  const fetchPastPlacements = async () => {
+    try {
+      setPastPlacementsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/placement-showcase`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { limit: 20 }
+      });
+      setPastPlacements(Array.isArray(response.data?.placements) ? response.data.placements : []);
+    } catch (error) {
+      console.error('Error fetching past placements:', error);
+      setPastPlacements([]);
+    } finally {
+      setPastPlacementsLoading(false);
     }
   };
 
@@ -1402,11 +1502,61 @@ const StudentDashboard = () => {
 
                   {activeTab === 'Placements' && (
                     <div>
-                      <div className="stat-card" style={{ maxWidth: 420 }}>
+                      <div className="stat-card" style={{ maxWidth: 520 }}>
                         <div className="stat-icon"><FaBriefcase /></div>
                         <div className="stat-info">
-                          <h3>Upcoming Drive: TechCorp</h3>
-                          <p className="confidence-label">Register before: 01 Dec 2025</p>
+                          <h3>Placement Status: {studentData?.placementStatus || 'Not Eligible'}</h3>
+                          <p className="confidence-label">
+                            Company: {studentData?.companyName || 'Not assigned'}
+                          </p>
+                          <p className="confidence-label">
+                            Package (LPA): {studentData?.package ?? 'N/A'}
+                          </p>
+                          <p className="confidence-label">
+                            Offer Date: {studentData?.offerLetterDate ? new Date(studentData.offerLetterDate).toLocaleDateString() : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="card" style={{ marginTop: '1rem' }}>
+                        <div className="card-header">
+                          <h2 className="card-title"><FaBriefcase /> Past Placed Students</h2>
+                        </div>
+                        <div className="card-body">
+                          {pastPlacementsLoading ? (
+                            <div style={{ textAlign: 'center', padding: '1rem' }}><div className="spinner"></div></div>
+                          ) : pastPlacements.length === 0 ? (
+                            <p style={{ color: 'var(--muted)' }}>No past placement records available.</p>
+                          ) : (
+                            <div className="table-responsive">
+                              <table className="data-table">
+                                <thead>
+                                  <tr>
+                                    <th>Student</th>
+                                    <th>Year</th>
+                                    <th>Branch</th>
+                                    <th>Company</th>
+                                    <th>Role</th>
+                                    <th>Package (LPA)</th>
+                                    <th>Placed Year</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {pastPlacements.map((entry) => (
+                                    <tr key={entry._id}>
+                                      <td>{entry.studentName}</td>
+                                      <td>{entry.year}</td>
+                                      <td>{entry.branch}</td>
+                                      <td>{entry.companyName}</td>
+                                      <td>{entry.role || '-'}</td>
+                                      <td>{entry.packageLpa ?? '-'}</td>
+                                      <td>{entry.placedYear}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

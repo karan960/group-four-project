@@ -82,11 +82,19 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const updateProfilePhoto = (profilePhoto) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      return { ...prev, profilePhoto: profilePhoto || '' };
+    });
+  };
+
   const value = {
     user,
     login,
     logout,
-    loading
+    loading,
+    updateProfilePhoto
   };
 
   return (

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import NotificationCenter from '../components/NotificationCenter';
 import TimetableBoard from '../components/TimetableBoard';
+import { fetchWithCacheSWR, prefetchWithCache } from '../utils/resilientFetch';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -21,13 +22,15 @@ import {
   FaChalkboardTeacher, FaChartLine, FaClipboardList, FaCog, FaUser,
   FaBell, FaCheck, FaTimes, FaUsers, FaBook, FaDoorOpen, FaBars,
   FaChevronLeft, FaGraduationCap, FaChartBar, FaBookOpen, FaEdit,
-  FaCalendar, FaHome, FaCheckCircle, FaClock, FaFileAlt, FaLock, FaQrcode
+  FaCalendar, FaHome, FaCheckCircle, FaClock, FaFileAlt, FaLock, FaQrcode, FaBriefcase
 } from 'react-icons/fa';
 import './FacultyDashboard.css';
 import './StudentDashboard.css';
 
 const localStorage = window.sessionStorage;
 const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
+const AUTH_API_BASE_URL = process.env.REACT_APP_AUTH_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
+const AUTH_API_FALLBACK_BASE_URL = `${window.location.protocol}//${window.location.hostname}:5000`;
 
 // Register ChartJS components
 ChartJS.register(
@@ -44,8 +47,61 @@ ChartJS.register(
 
 // Profile Dropdown Component
 const ProfileDropdown = ({ onViewProfile, onOpenSettings }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfilePhoto } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef(null);
+  const avatarSrc = user?.profilePhoto
+    ? `${AUTH_API_FALLBACK_BASE_URL}${user.profilePhoto}`
+    : '';
+
+  const handlePhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('profilePhoto', file);
+
+    try {
+      setUploadingPhoto(true);
+      const token = localStorage.getItem('token');
+      const baseCandidates = [...new Set([AUTH_API_BASE_URL, AUTH_API_FALLBACK_BASE_URL, 'http://localhost:5000'])];
+      let response = null;
+      let lastError = null;
+
+      for (const baseUrl of baseCandidates) {
+        try {
+          response = await axios.put(
+            `${baseUrl}/api/auth/profile-photo`,
+            formData,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'multipart/form-data'
+              }
+            }
+          );
+          break;
+        } catch (error) {
+          lastError = error;
+          if (error?.response?.status !== 404) {
+            throw error;
+          }
+        }
+      }
+
+      if (!response) {
+        throw lastError || new Error('Profile photo upload failed');
+      }
+
+      updateProfilePhoto(response.data?.profilePhoto || '');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to upload profile photo');
+    } finally {
+      setUploadingPhoto(false);
+      event.target.value = '';
+    }
+  };
 
   return (
     <div className="profile-dropdown">
@@ -54,7 +110,11 @@ const ProfileDropdown = ({ onViewProfile, onOpenSettings }) => {
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="profile-avatar">
-          {user?.username?.charAt(0).toUpperCase()}
+          {avatarSrc ? (
+            <img src={avatarSrc} alt="Profile" />
+          ) : (
+            user?.username?.charAt(0).toUpperCase()
+          )}
         </div>
       </div>
 
@@ -62,7 +122,11 @@ const ProfileDropdown = ({ onViewProfile, onOpenSettings }) => {
         <div className="profile-menu">
           <div className="profile-header">
             <div className="profile-avatar large">
-              {user?.username?.charAt(0).toUpperCase()}
+              {avatarSrc ? (
+                <img src={avatarSrc} alt="Profile" />
+              ) : (
+                user?.username?.charAt(0).toUpperCase()
+              )}
             </div>
             <div className="profile-info">
               <h4>{user?.username}</h4>
@@ -72,6 +136,20 @@ const ProfileDropdown = ({ onViewProfile, onOpenSettings }) => {
           </div>
           
           <div className="profile-actions">
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              style={{ display: 'none' }}
+              onChange={handlePhotoUpload}
+            />
+            <button
+              className="profile-btn"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={uploadingPhoto}
+            >
+              <FaEdit /> {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+            </button>
             <button
               className="profile-btn"
               onClick={() => {
@@ -113,6 +191,8 @@ const FacultyDashboard = () => {
   const [settingsTab, setSettingsTab] = useState('profile');
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [courses, setCourses] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
@@ -156,6 +236,8 @@ const FacultyDashboard = () => {
   const [selectedStudentAnalysis, setSelectedStudentAnalysis] = useState(null);
   const [selectedStudentAnalysisLoading, setSelectedStudentAnalysisLoading] = useState(false);
   const [selectedStudentAnalysisError, setSelectedStudentAnalysisError] = useState('');
+  const [showStudentAnalysisModal, setShowStudentAnalysisModal] = useState(false);
+  const [selectedStudentMeta, setSelectedStudentMeta] = useState(null);
   const [attendanceForm, setAttendanceForm] = useState({
     prn: '',
     month: 'Overall',
@@ -198,6 +280,9 @@ const FacultyDashboard = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedHistorySession, setSelectedHistorySession] = useState(null);
   const [approvedStudentsForSession, setApprovedStudentsForSession] = useState([]);
+  const [pastPlacements, setPastPlacements] = useState([]);
+  const [pastPlacementsLoading, setPastPlacementsLoading] = useState(false);
+  const preloadedStudentAnalysisIdsRef = useRef(new Set());
 
   const selectedPerformance = selectedStudentAnalysis?.individual?.performance || {};
   const selectedTrend = Array.isArray(selectedStudentAnalysis?.improvement?.trend_data)
@@ -263,6 +348,42 @@ const FacultyDashboard = () => {
         backgroundColor: '#9b59b6'
       }
     ]
+  };
+
+  const formatTimeAgo = (timestamp) => {
+    if (!timestamp) return 'Just now';
+
+    const eventTime = new Date(timestamp).getTime();
+    if (Number.isNaN(eventTime)) return 'Just now';
+
+    const diffMs = Date.now() - eventTime;
+    const diffSeconds = Math.max(1, Math.floor(diffMs / 1000));
+
+    if (diffSeconds < 60) return `${diffSeconds} sec ago`;
+
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) return `${diffMinutes} min ago`;
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+
+    return new Date(timestamp).toLocaleDateString();
+  };
+
+  const getActivityIcon = (activityType) => {
+    switch (activityType) {
+      case 'attendance':
+        return <FaCheckCircle />;
+      case 'assignment':
+        return <FaEdit />;
+      case 'course':
+        return <FaBookOpen />;
+      default:
+        return <FaClock />;
+    }
   };
 
   const handleViewProfile = () => {
@@ -391,11 +512,70 @@ const FacultyDashboard = () => {
   }, []);
 
   useEffect(() => {
+    let intervalId;
+
+    const startActivityPolling = async () => {
+      await fetchRecentActivities();
+      intervalId = setInterval(fetchRecentActivities, 10000);
+    };
+
+    startActivityPolling();
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [facultyData?.facultyId, user?.referenceId]);
+
+  useEffect(() => {
+    const facultyId = (facultyData?.facultyId || user?.referenceId || '').toUpperCase();
+    if (!facultyId) return;
+
+    const token = localStorage.getItem('token');
+    const headers = { Authorization: `Bearer ${token}` };
+
+    // Predictive pre-loading based on common faculty navigation flows.
+    const warmLikelyTabs = async () => {
+      if (activeTab === 'Dashboard') {
+        await Promise.all([
+          prefetchWithCache({ url: `${API_BASE_URL}/api/courses`, headers, ttlMs: 60000 }),
+          prefetchWithCache({ url: `${API_BASE_URL}/api/assignments`, headers, ttlMs: 60000 })
+        ]);
+      } else if (activeTab === 'Courses') {
+        await prefetchWithCache({ url: `${API_BASE_URL}/api/assignments`, headers, ttlMs: 60000 });
+      }
+    };
+
+    warmLikelyTabs();
+  }, [activeTab, facultyData?.facultyId, user?.referenceId]);
+
+  useEffect(() => {
+    if (!showStudentAnalysisModal) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setShowStudentAnalysisModal(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [showStudentAnalysisModal]);
+
+  useEffect(() => {
     if (activeTab === 'Subjects') {
       fetchFacultySubjectAnalysis();
     }
     if (activeTab === 'Students') {
-      fetchFacultyStudentsAnalysis();
+      fetchFacultyStudentsAnalysis({ showLoading: facultyStudentsAnalysis.length === 0 });
     }
     if (activeTab === 'Courses') {
       fetchCourses();
@@ -406,6 +586,9 @@ const FacultyDashboard = () => {
     }
     if (activeTab === 'Timetable') {
       fetchFacultyTimetable();
+    }
+    if (activeTab === 'Placements') {
+      fetchPastPlacements();
     }
   }, [activeTab, facultyData?._id]);
 
@@ -439,25 +622,81 @@ const FacultyDashboard = () => {
     }
   };
 
-  const fetchFacultyStudentsAnalysis = async () => {
-    try {
-      const facultyIdentifier = facultyData?._id || facultyData?.facultyId || user?.referenceId;
-      if (!facultyIdentifier) return;
+  const fetchFacultyStudentsAnalysisList = async ({ showLoading = true } = {}) => {
+    const facultyIdentifier = facultyData?._id || facultyData?.facultyId || user?.referenceId;
+    if (!facultyIdentifier) {
+      return [];
+    }
+
+    if (showLoading) {
       setStudentsAnalysisLoading(true);
+    }
+
+    try {
       setStudentsAnalysisError('');
-      setSelectedStudentAnalysis(null);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/api/ml-analysis/faculty/${facultyIdentifier}/students-analysis`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await fetchWithCacheSWR({
+        url: `${API_BASE_URL}/api/ml-analysis/faculty/${facultyIdentifier}/students-analysis`,
+        method: 'get',
+        headers: { Authorization: `Bearer ${token}` },
+        ttlMs: 2 * 60 * 1000,
+        retries: 2,
+        backgroundRefresh: true,
+        onFreshData: (freshData) => {
+          const freshStudents = Array.isArray(freshData?.students) ? freshData.students : [];
+          setFacultyStudentsAnalysis(freshStudents);
+        }
       });
-      setFacultyStudentsAnalysis(response.data?.students || []);
+
+      const students = Array.isArray(response.data?.students) ? response.data.students : [];
+      setFacultyStudentsAnalysis(students);
+      return students;
+    } catch (error) {
+      setStudentsAnalysisError(error.response?.data?.error || error.message);
+      return [];
+    } finally {
+      if (showLoading) {
+        setStudentsAnalysisLoading(false);
+      }
+    }
+  };
+
+  const fetchFacultyStudentsAnalysis = async ({ showLoading = true } = {}) => {
+    try {
+      await fetchFacultyStudentsAnalysisList({ showLoading });
     } catch (error) {
       console.error('Error fetching faculty students analysis list:', error);
       setStudentsAnalysisError(error.response?.data?.error || error.message);
       setFacultyStudentsAnalysis([]);
-    } finally {
-      setStudentsAnalysisLoading(false);
     }
+  };
+
+  const prefetchStudentAnalysis = async (studentId) => {
+    if (!studentId || preloadedStudentAnalysisIdsRef.current.has(studentId)) return;
+
+    const token = localStorage.getItem('token');
+    const didPrefetch = await prefetchWithCache({
+      url: `${API_BASE_URL}/api/ml-analysis/student/${studentId}/full-analysis`,
+      headers: { Authorization: `Bearer ${token}` },
+      ttlMs: 5 * 60 * 1000,
+      retries: 1
+    });
+
+    if (didPrefetch) {
+      preloadedStudentAnalysisIdsRef.current.add(studentId);
+    }
+  };
+
+  const openStudentAnalysisModal = (student) => {
+    if (!student?._id) {
+      setSelectedStudentAnalysisError('Invalid student selection. Please refresh and try again.');
+      return;
+    }
+
+    setSelectedStudentMeta(student);
+    setSelectedStudentAnalysisError('');
+    setShowStudentAnalysisModal(true);
+    fetchFullStudentAnalysis(student._id);
   };
 
   const fetchFullStudentAnalysis = async (studentId) => {
@@ -470,10 +709,20 @@ const FacultyDashboard = () => {
       setSelectedStudentAnalysisError('');
       setSelectedStudentAnalysis(null);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/api/ml-analysis/student/${studentId}/full-analysis`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await fetchWithCacheSWR({
+        url: `${API_BASE_URL}/api/ml-analysis/student/${studentId}/full-analysis`,
+        method: 'get',
+        headers: { Authorization: `Bearer ${token}` },
+        ttlMs: 5 * 60 * 1000,
+        retries: 2,
+        backgroundRefresh: true,
+        onFreshData: (freshData) => {
+          setSelectedStudentAnalysis(freshData || null);
+          preloadedStudentAnalysisIdsRef.current.add(studentId);
+        }
       });
       setSelectedStudentAnalysis(response.data || null);
+      preloadedStudentAnalysisIdsRef.current.add(studentId);
     } catch (error) {
       console.error('Error fetching full student analysis:', error);
       setSelectedStudentAnalysisError(error.response?.data?.error || error.message);
@@ -505,6 +754,23 @@ const FacultyDashboard = () => {
       setFacultyTimetableEntries([]);
     } finally {
       setFacultyTimetableLoading(false);
+    }
+  };
+
+  const fetchPastPlacements = async () => {
+    try {
+      setPastPlacementsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/placement-showcase`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { limit: 30 }
+      });
+      setPastPlacements(Array.isArray(response.data?.placements) ? response.data.placements : []);
+    } catch (error) {
+      console.error('Error fetching past placements:', error);
+      setPastPlacements([]);
+    } finally {
+      setPastPlacementsLoading(false);
     }
   };
 
@@ -574,6 +840,39 @@ const FacultyDashboard = () => {
     }
   };
 
+  const fetchRecentActivities = async () => {
+    try {
+      const facultyId = (facultyData?.facultyId || user?.referenceId || '').toUpperCase();
+      if (!facultyId) {
+        setRecentActivities([]);
+        return;
+      }
+
+      setActivitiesLoading(true);
+      const token = localStorage.getItem('token');
+      const requestUrl = `${API_BASE_URL}/api/dashboard/faculty/${facultyId}/activities?limit=10`;
+
+      const response = await fetchWithCacheSWR({
+        url: requestUrl,
+        method: 'get',
+        headers: { Authorization: `Bearer ${token}` },
+        ttlMs: 30000,
+        retries: 2,
+        backgroundRefresh: true,
+        onFreshData: (freshData) => {
+          const freshActivities = Array.isArray(freshData?.activities) ? freshData.activities : [];
+          setRecentActivities(freshActivities);
+        }
+      });
+
+      setRecentActivities(Array.isArray(response.data?.activities) ? response.data.activities : []);
+    } catch (error) {
+      console.error('Error fetching recent activities:', error);
+    } finally {
+      setActivitiesLoading(false);
+    }
+  };
+
   const fetchCourses = async () => {
     try {
       setCoursesLoading(true);
@@ -631,6 +930,7 @@ const FacultyDashboard = () => {
       });
       setCourseForm({ title: '', code: '', description: '', year: '', branch: '', division: '', semester: '', file: null });
       setCourses((prev) => [response.data.course, ...prev]);
+      await fetchRecentActivities();
     } catch (error) {
       console.error('Error creating course:', error);
     }
@@ -661,6 +961,7 @@ const FacultyDashboard = () => {
       });
       setAssignmentForm({ courseId: '', title: '', description: '', dueDate: '', totalMarks: '', file: null });
       setAssignments((prev) => [response.data.assignment, ...prev]);
+      await fetchRecentActivities();
     } catch (error) {
       console.error('Error creating assignment:', error);
     }
@@ -866,6 +1167,7 @@ const FacultyDashboard = () => {
       setPendingRequests([]);
       setSessionActionStatus('[OK] Session QR generated. Ask students to scan and send request.');
       await fetchAttendanceSessionHistory();
+      await fetchRecentActivities();
     } catch (error) {
       setSessionActionStatus('[ERR] ' + (error.response?.data?.message || error.message));
     }
@@ -1184,6 +1486,21 @@ const FacultyDashboard = () => {
           <a
             role="button"
             tabIndex={0}
+            className={`nav-item ${activeTab === 'Placements' ? 'active' : ''}`}
+            onClick={() => {
+              setShowProfileDetails(false);
+              setActiveTab('Placements');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setShowProfileDetails(false);
+                setActiveTab('Placements');
+              }
+            }}
+          ><span className="nav-icon"><FaBriefcase /></span><span className="nav-label">Placements</span></a>
+          <a
+            role="button"
+            tabIndex={0}
             className={`nav-item ${activeTab === 'Timetable' ? 'active' : ''}`}
             onClick={() => {
               setShowProfileDetails(false);
@@ -1393,27 +1710,35 @@ const FacultyDashboard = () => {
                 </div>
                 <div className="card-body">
                   <div className="activities-list">
-                    <div className="activity-item">
-                      <div className="activity-icon"><FaCheckCircle /></div>
-                      <div className="activity-content">
-                        <p>Marked attendance for Data Structures - 15 Jan 2024</p>
-                        <span className="activity-time">2 hours ago</span>
+                    {activitiesLoading && recentActivities.length === 0 && (
+                      <div className="activity-item skeleton-activity" aria-hidden="true">
+                        <div className="activity-icon skeleton-icon" />
+                        <div className="activity-content">
+                          <div className="skeleton-line skeleton-line-title" />
+                          <div className="skeleton-line skeleton-line-subtitle" />
+                        </div>
                       </div>
-                    </div>
-                    <div className="activity-item">
-                      <div className="activity-icon"><FaEdit /></div>
-                      <div className="activity-content">
-                        <p>Uploaded assignment for Algorithms</p>
-                        <span className="activity-time">1 day ago</span>
+                    )}
+
+                    {!activitiesLoading && recentActivities.length === 0 && (
+                      <div className="activity-item">
+                        <div className="activity-icon"><FaClock /></div>
+                        <div className="activity-content">
+                          <p>No recent activity yet.</p>
+                          <span className="activity-time">New actions will appear here in real time</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="activity-item">
-                      <div className="activity-icon"><FaUsers /></div>
-                      <div className="activity-content">
-                        <p>Conducted extra class for Database Systems</p>
-                        <span className="activity-time">2 days ago</span>
+                    )}
+
+                    {recentActivities.map((activity) => (
+                      <div className="activity-item" key={activity.id || `${activity.type}-${activity.timestamp}`}>
+                        <div className="activity-icon">{getActivityIcon(activity.type)}</div>
+                        <div className="activity-content">
+                          <p>{activity.details ? `${activity.title} - ${activity.details}` : activity.title}</p>
+                          <span className="activity-time">{formatTimeAgo(activity.timestamp)}</span>
+                        </div>
                       </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -2088,6 +2413,9 @@ const FacultyDashboard = () => {
                                 <th>PRN</th>
                                 <th>Year</th>
                                 <th>Division</th>
+                                <th>Placement</th>
+                                <th>Company</th>
+                                <th>Package</th>
                                 <th>Status</th>
                                 <th>Action</th>
                               </tr>
@@ -2099,11 +2427,16 @@ const FacultyDashboard = () => {
                                   <td>{student.prn}</td>
                                   <td>{student.year}</td>
                                   <td>{student.division}</td>
+                                  <td>{student.placementStatus || 'Not Eligible'}</td>
+                                  <td>{student.companyName || '-'}</td>
+                                  <td>{student.package ?? '-'}</td>
                                   <td>{student.status}</td>
                                   <td>
                                     <button
                                       className="btn-small btn-primary"
-                                      onClick={() => fetchFullStudentAnalysis(student._id)}
+                                      onMouseEnter={() => prefetchStudentAnalysis(student._id)}
+                                      onFocus={() => prefetchStudentAnalysis(student._id)}
+                                      onClick={() => openStudentAnalysisModal(student)}
                                     >
                                       Analysis
                                     </button>
@@ -2115,109 +2448,52 @@ const FacultyDashboard = () => {
                         </div>
                       )}
 
-                      {selectedStudentAnalysis && (
-                        <div className="card" style={{ marginTop: '1rem' }}>
-                          <div className="card-header">
-                            <h2 className="card-title">Student Full Analysis</h2>
-                          </div>
-                          <div className="card-body">
-                            {selectedStudentAnalysis.error ? (
-                              <p style={{ color: 'var(--danger)' }}>{selectedStudentAnalysis.error}</p>
-                            ) : (
-                              <>
-                                <div className="output-grid" style={{ marginBottom: '1rem' }}>
-                                  <div><strong>Name:</strong> {selectedStudentAnalysis.student?.studentName}</div>
-                                  <div><strong>PRN:</strong> {selectedStudentAnalysis.student?.prn}</div>
-                                  <div><strong>Year:</strong> {selectedStudentAnalysis.student?.year}</div>
-                                  <div><strong>Division:</strong> {selectedStudentAnalysis.student?.division}</div>
-                                  <div><strong>Category:</strong> {selectedPerformance?.performance_category || '-'}</div>
-                                  <div><strong>Risk:</strong> {selectedPerformance?.risk_level || '-'}</div>
-                                </div>
+                    </div>
+                  )}
 
-                                <div className="charts-grid">
-                                  <div className="chart-card">
-                                    <h3>Performance Components</h3>
-                                    <div className="chart-container">
-                                      <Bar
-                                        data={selectedPerformanceChartData}
-                                        options={{ responsive: true, plugins: { legend: { display: false } } }}
-                                      />
-                                    </div>
-                                  </div>
-                                  <div className="chart-card">
-                                    <h3>Placement Probability</h3>
-                                    <div className="chart-container">
-                                      <Doughnut
-                                        data={selectedRiskChartData}
-                                        options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="charts-grid" style={{ marginTop: '1rem' }}>
-                                  <div className="chart-card">
-                                    <h3>Semester SGPA Trend</h3>
-                                    <div className="chart-container">
-                                      {selectedTrendChartData.labels.length > 0 ? (
-                                        <Line
-                                          data={selectedTrendChartData}
-                                          options={{ responsive: true, plugins: { legend: { display: false } } }}
-                                        />
-                                      ) : (
-                                        <div style={{ color: 'var(--muted)' }}>No semester trend data available.</div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="chart-card">
-                                    <h3>Top Subject Scores</h3>
-                                    <div className="chart-container">
-                                      {selectedSubjectChartData.labels.length > 0 ? (
-                                        <Bar
-                                          data={selectedSubjectChartData}
-                                          options={{ responsive: true, plugins: { legend: { display: false } } }}
-                                        />
-                                      ) : (
-                                        <div style={{ color: 'var(--muted)' }}>No subject score data available.</div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="card" style={{ marginTop: '1rem' }}>
-                                  <div className="card-header">
-                                    <h3 className="card-title">Personalized Recommendations</h3>
-                                  </div>
-                                  <div className="card-body">
-                                    <ul style={{ margin: 0, paddingLeft: '1rem' }}>
-                                      {(selectedPerformance?.recommendations || []).map((rec, idx) => (
-                                        <li key={`rec-${idx}`}>{rec}</li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                </div>
-                              </>
-                            )}
-                          </div>
+                  {activeTab === 'Placements' && (
+                    <div>
+                      <div className="card">
+                        <div className="card-header">
+                          <h2 className="card-title"><FaBriefcase /> Past Placed Students</h2>
                         </div>
-                      )}
-
-                      {selectedStudentAnalysisLoading && (
-                        <div className="card" style={{ marginTop: '1rem' }}>
-                          <div className="card-body" style={{ textAlign: 'center' }}>
-                            <div className="spinner"></div>
-                            Loading detailed student analysis...
-                          </div>
+                        <div className="card-body">
+                          {pastPlacementsLoading ? (
+                            <div style={{ textAlign: 'center', padding: '1rem' }}><div className="spinner"></div></div>
+                          ) : pastPlacements.length === 0 ? (
+                            <p style={{ color: 'var(--muted)' }}>No past placement records available.</p>
+                          ) : (
+                            <div className="table-responsive">
+                              <table className="data-table">
+                                <thead>
+                                  <tr>
+                                    <th>Student</th>
+                                    <th>Year</th>
+                                    <th>Branch</th>
+                                    <th>Company</th>
+                                    <th>Role</th>
+                                    <th>Package (LPA)</th>
+                                    <th>Placed Year</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {pastPlacements.map((entry) => (
+                                    <tr key={entry._id}>
+                                      <td>{entry.studentName}</td>
+                                      <td>{entry.year}</td>
+                                      <td>{entry.branch}</td>
+                                      <td>{entry.companyName}</td>
+                                      <td>{entry.role || '-'}</td>
+                                      <td>{entry.packageLpa ?? '-'}</td>
+                                      <td>{entry.placedYear}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
                         </div>
-                      )}
-
-                      {selectedStudentAnalysisError && (
-                        <div className="card" style={{ marginTop: '1rem' }}>
-                          <div className="card-body">
-                            <p style={{ color: 'var(--danger)', margin: 0 }}>{selectedStudentAnalysisError}</p>
-                          </div>
-                        </div>
-                      )}
+                      </div>
                     </div>
                   )}
 
@@ -2246,6 +2522,122 @@ const FacultyDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Notification Center Modal */}
+      {showStudentAnalysisModal && (
+        <div className="modal-overlay" onClick={() => setShowStudentAnalysisModal(false)}>
+          <div
+            className="modal student-analysis-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h3>
+                <FaChartLine /> Student Full Analysis
+                {selectedStudentMeta?.studentName ? ` - ${selectedStudentMeta.studentName}` : ''}
+              </h3>
+              <button onClick={() => setShowStudentAnalysisModal(false)} className="btn-close">×</button>
+            </div>
+
+            <div className="modal-body">
+              {selectedStudentAnalysisLoading && (
+                <div className="analysis-loading-state">
+                  <div className="spinner"></div>
+                  <p>Preparing student analysis...</p>
+                </div>
+              )}
+
+              {!selectedStudentAnalysisLoading && selectedStudentAnalysisError && (
+                <p style={{ color: 'var(--danger)', margin: 0 }}>{selectedStudentAnalysisError}</p>
+              )}
+
+              {!selectedStudentAnalysisLoading && selectedStudentAnalysis && (
+                <>
+                  {selectedStudentAnalysis.error ? (
+                    <p style={{ color: 'var(--danger)' }}>{selectedStudentAnalysis.error}</p>
+                  ) : (
+                    <>
+                      <div className="output-grid" style={{ marginBottom: '1rem' }}>
+                        <div><strong>Name:</strong> {selectedStudentAnalysis.student?.studentName}</div>
+                        <div><strong>PRN:</strong> {selectedStudentAnalysis.student?.prn}</div>
+                        <div><strong>Year:</strong> {selectedStudentAnalysis.student?.year}</div>
+                        <div><strong>Division:</strong> {selectedStudentAnalysis.student?.division}</div>
+                        <div><strong>Placement:</strong> {selectedStudentAnalysis.student?.placementStatus || 'Not Eligible'}</div>
+                        <div><strong>Company:</strong> {selectedStudentAnalysis.student?.companyName || '-'}</div>
+                        <div><strong>Package:</strong> {selectedStudentAnalysis.student?.package ?? '-'}</div>
+                        <div><strong>Category:</strong> {selectedPerformance?.performance_category || '-'}</div>
+                        <div><strong>Risk:</strong> {selectedPerformance?.risk_level || '-'}</div>
+                      </div>
+
+                      <div className="charts-grid">
+                        <div className="chart-card">
+                          <h3>Performance Components</h3>
+                          <div className="chart-container">
+                            <Bar
+                              data={selectedPerformanceChartData}
+                              options={{ responsive: true, plugins: { legend: { display: false } } }}
+                            />
+                          </div>
+                        </div>
+                        <div className="chart-card">
+                          <h3>Placement Probability</h3>
+                          <div className="chart-container">
+                            <Doughnut
+                              data={selectedRiskChartData}
+                              options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="charts-grid" style={{ marginTop: '1rem' }}>
+                        <div className="chart-card">
+                          <h3>Semester SGPA Trend</h3>
+                          <div className="chart-container">
+                            {selectedTrendChartData.labels.length > 0 ? (
+                              <Line
+                                data={selectedTrendChartData}
+                                options={{ responsive: true, plugins: { legend: { display: false } } }}
+                              />
+                            ) : (
+                              <div style={{ color: 'var(--muted)' }}>No semester trend data available.</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="chart-card">
+                          <h3>Top Subject Scores</h3>
+                          <div className="chart-container">
+                            {selectedSubjectChartData.labels.length > 0 ? (
+                              <Bar
+                                data={selectedSubjectChartData}
+                                options={{ responsive: true, plugins: { legend: { display: false } } }}
+                              />
+                            ) : (
+                              <div style={{ color: 'var(--muted)' }}>No subject score data available.</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="card" style={{ marginTop: '1rem' }}>
+                        <div className="card-header">
+                          <h3 className="card-title">Personalized Recommendations</h3>
+                        </div>
+                        <div className="card-body">
+                          <ul style={{ margin: 0, paddingLeft: '1rem' }}>
+                            {(selectedPerformance?.recommendations || []).map((rec, idx) => (
+                              <li key={`rec-${idx}`}>{rec}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notification Center Modal */}
       {showProfileDetails && (

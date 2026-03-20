@@ -2,11 +2,43 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const User = require('../models/User');
 const Student = require('../models/Student');
 const Faculty = require('../models/Faculty');
 
 const jwtSecret = (process.env.JWT_SECRET || '').trim();
+
+const profilePhotoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '..', 'uploads', 'profile-photos');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  }
+});
+
+const profilePhotoUpload = multer({
+  storage: profilePhotoStorage,
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPG, PNG, and WEBP images are allowed'));
+    }
+  },
+  limits: {
+    fileSize: 2 * 1024 * 1024
+  }
+});
 
 // ==================== AUTHENTICATION ====================
 
@@ -140,6 +172,7 @@ router.post('/login', async (req, res) => {
         username: user.username,
         role: user.role,
         referenceId: user.referenceId,
+        profilePhoto: user.profilePhoto || '',
         ...profileData
       }
     });
@@ -180,6 +213,60 @@ router.get('/profile', async (req, res) => {
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({ message: 'Invalid token' });
     }
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+router.put('/profile-photo', profilePhotoUpload.single('profilePhoto'), async (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+
+    if (!token) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'Profile photo is required' });
+    }
+
+    const decoded = jwt.verify(token, jwtSecret);
+    const user = await User.findById(decoded.userId);
+
+    if (!user || !user.isActive) {
+      return res.status(404).json({ message: 'User not found or inactive' });
+    }
+
+    const oldPhotoPath = user.profilePhoto && user.profilePhoto.startsWith('/uploads/profile-photos/')
+      ? path.join(__dirname, '..', user.profilePhoto.replace(/^\//, ''))
+      : '';
+
+    user.profilePhoto = `/uploads/profile-photos/${req.file.filename}`;
+    await user.save();
+
+    if (oldPhotoPath && fs.existsSync(oldPhotoPath)) {
+      fs.unlinkSync(oldPhotoPath);
+    }
+
+    res.json({
+      message: 'Profile photo updated successfully',
+      profilePhoto: user.profilePhoto
+    });
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+
+    if (error instanceof multer.MulterError) {
+      if (error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ message: 'Image size must be up to 2MB' });
+      }
+      return res.status(400).json({ message: error.message });
+    }
+
+    if (error.message && error.message.includes('Only JPG, PNG, and WEBP images are allowed')) {
+      return res.status(400).json({ message: error.message });
+    }
+
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
