@@ -2,6 +2,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const compression = require('compression');
 const multer = require('multer');
 const xlsx = require('xlsx');
 const path = require('path');
@@ -51,6 +52,7 @@ app.use(cors({
 }));
 
 app.options('*', cors());
+app.use(compression());
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 app.use('/backups', express.static(path.join(__dirname, 'backups')));
@@ -117,6 +119,7 @@ const assignmentRoutes = require('./routes/assignmentRoutes');
 const timetableRoutes = require('./routes/timetableRoutes');
 const timetablePublicRoutes = require('./routes/timetablePublicRoutes');
 const attendanceSessionRoutes = require('./routes/attendanceSessionRoutes');
+const placementShowcaseRoutes = require('./routes/placementShowcaseRoutes');
 
 // ==================== MIDDLEWARE ====================
 const authMiddleware = async (req, res, next) => {
@@ -213,6 +216,10 @@ app.use('/api/notifications', authMiddleware, notificationRoutes);
 app.use('/api/courses', authMiddleware, courseRoutes);
 app.use('/api/assignments', authMiddleware, assignmentRoutes);
 app.use('/api/attendance-sessions', authMiddleware, attendanceSessionRoutes);
+app.use('/api/placement-showcase', authMiddleware, placementShowcaseRoutes);
+// Backward-compatible aliases for past placement showcase routes.
+app.use('/api/placements/showcase', authMiddleware, placementShowcaseRoutes);
+app.use('/api/showcase/placements', authMiddleware, placementShowcaseRoutes);
 app.use('/api', authMiddleware, timetableRoutes);
 app.use('/api', timetablePublicRoutes);
 
@@ -995,6 +1002,44 @@ app.delete('/api/users/:userId', authMiddleware, adminMiddleware, async (req, re
     await User.findByIdAndDelete(userId);
 
     res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+app.put('/api/users/profile', authMiddleware, async (req, res) => {
+  try {
+    const { username, referenceId } = req.body || {};
+
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (username && String(username).trim() !== user.username) {
+      const existing = await User.findOne({ username: String(username).trim() });
+      if (existing && String(existing._id) !== String(user._id)) {
+        return res.status(400).json({ message: 'Username already exists' });
+      }
+      user.username = String(username).trim();
+    }
+
+    if (referenceId !== undefined && referenceId !== null) {
+      user.referenceId = String(referenceId).trim();
+    }
+
+    await user.save();
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        role: user.role,
+        referenceId: user.referenceId,
+        lastLogin: user.lastLogin
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

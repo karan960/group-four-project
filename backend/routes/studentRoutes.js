@@ -4,7 +4,120 @@ const Student = require('../models/Student');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 
+const ensureAdmin = (req, res) => {
+  if (String(req.user?.role || '').toLowerCase() !== 'admin') {
+    res.status(403).json({ message: 'Admin access required' });
+    return false;
+  }
+  return true;
+};
+
 // ==================== STUDENT CRUD OPERATIONS ====================
+
+// GET placement records with year-wise filters (admin)
+router.get('/placements', async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return;
+
+    const { year, placementStatus, search } = req.query;
+    const query = { isActive: true };
+
+    if (year) query.year = year;
+    if (placementStatus) query.placementStatus = placementStatus;
+    if (search) {
+      query.$or = [
+        { studentName: { $regex: search, $options: 'i' } },
+        { prn: { $regex: search, $options: 'i' } },
+        { rollNo: { $regex: search, $options: 'i' } },
+        { companyName: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const students = await Student.find(query)
+      .select('prn rollNo studentName year branch division placementStatus companyName package offerLetterDate')
+      .sort({ year: 1, studentName: 1 });
+
+    const yearWiseSummary = students.reduce((acc, student) => {
+      const studentYear = student.year || 'Unknown';
+      if (!acc[studentYear]) {
+        acc[studentYear] = { total: 0, placed: 0, eligible: 0, notEligible: 0, higherStudies: 0 };
+      }
+
+      acc[studentYear].total += 1;
+      if (student.placementStatus === 'Placed') acc[studentYear].placed += 1;
+      if (student.placementStatus === 'Eligible') acc[studentYear].eligible += 1;
+      if (student.placementStatus === 'Not Eligible') acc[studentYear].notEligible += 1;
+      if (student.placementStatus === 'Higher Studies') acc[studentYear].higherStudies += 1;
+
+      return acc;
+    }, {});
+
+    res.json({
+      students,
+      total: students.length,
+      yearWiseSummary
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// PUT update student placement details (admin)
+router.put('/placements/:prn', async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return;
+
+    const { placementStatus, companyName, package: offeredPackage, offerLetterDate } = req.body;
+
+    if (!placementStatus) {
+      return res.status(400).json({ message: 'placementStatus is required' });
+    }
+
+    const student = await Student.findOne({ prn: req.params.prn, isActive: true });
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    const normalizedStatus = String(placementStatus).trim();
+    const normalizedCompany = String(companyName || '').trim();
+    const parsedPackage = offeredPackage === '' || offeredPackage === null || offeredPackage === undefined
+      ? null
+      : Number(offeredPackage);
+
+    if (normalizedStatus === 'Placed') {
+      if (!normalizedCompany) {
+        return res.status(400).json({ message: 'companyName is required when student is placed' });
+      }
+      if (!Number.isFinite(parsedPackage) || parsedPackage <= 0) {
+        return res.status(400).json({ message: 'Valid package is required when student is placed' });
+      }
+    }
+
+    student.placementStatus = normalizedStatus;
+    student.companyName = normalizedStatus === 'Placed' ? normalizedCompany : (normalizedCompany || '');
+    student.package = normalizedStatus === 'Placed' ? parsedPackage : null;
+    student.offerLetterDate = offerLetterDate ? new Date(offerLetterDate) : null;
+    student.lastUpdated = Date.now();
+    student.updatedBy = req.user?.username || 'admin';
+
+    await student.save();
+
+    res.json({
+      message: 'Placement details updated successfully',
+      student: {
+        prn: student.prn,
+        studentName: student.studentName,
+        year: student.year,
+        placementStatus: student.placementStatus,
+        companyName: student.companyName,
+        package: student.package,
+        offerLetterDate: student.offerLetterDate
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
 
 // GET all students with filtering and pagination
 router.get('/', async (req, res) => {
