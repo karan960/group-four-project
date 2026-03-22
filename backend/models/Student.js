@@ -1,5 +1,25 @@
 const mongoose = require('mongoose');
 
+const IT_DEPARTMENT = 'Information Technology';
+const ALLOWED_YEARS = ['First', 'Second', 'Third', 'Fourth'];
+const ALLOWED_DIVISIONS = ['A', 'B'];
+
+const normalizeYear = (yearValue) => {
+  const value = String(yearValue || '').trim();
+  if (!value) return 'First';
+
+  const byNumber = {
+    '1': 'First',
+    '2': 'Second',
+    '3': 'Third',
+    '4': 'Fourth'
+  };
+  if (byNumber[value]) return byNumber[value];
+
+  const cap = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+  return ALLOWED_YEARS.includes(cap) ? cap : 'First';
+};
+
 // Sub-schema for semester marks
 const semesterMarksSchema = new mongoose.Schema({
   year: { 
@@ -77,8 +97,18 @@ const studentSchema = new mongoose.Schema({
   status: { type: String },
   seatNo: { type: String },
   department: { type: String },
-  branch: { type: String, required: true },
-  division: { type: String, required: true },
+  branch: {
+    type: String,
+    required: true,
+    enum: [IT_DEPARTMENT],
+    default: IT_DEPARTMENT
+  },
+  division: {
+    type: String,
+    required: true,
+    enum: ALLOWED_DIVISIONS,
+    default: 'A'
+  },
   email: { type: String, required: true },
   mobileNo: { type: String },
   address: { type: String },
@@ -160,12 +190,14 @@ studentSchema.index({ placementStatus: 1 });
 
 // Keep branch and department in sync so legacy and new payloads both work.
 studentSchema.pre('validate', function syncBranchAndDepartment(next) {
-  if (!this.branch && this.department) {
-    this.branch = this.department;
-  }
-  if (!this.department && this.branch) {
-    this.department = this.branch;
-  }
+  this.year = normalizeYear(this.year);
+
+  this.branch = IT_DEPARTMENT;
+  this.department = IT_DEPARTMENT;
+
+  const normalizedDivision = String(this.division || 'A').trim().toUpperCase();
+  this.division = ALLOWED_DIVISIONS.includes(normalizedDivision) ? normalizedDivision : 'A';
+
   next();
 });
 

@@ -1,5 +1,18 @@
 const mongoose = require('mongoose');
 
+const IT_DEPARTMENT = 'Information Technology';
+const ALLOWED_YEARS = ['First', 'Second', 'Third', 'Fourth', 'ALL'];
+const ALLOWED_DIVISIONS = ['A', 'B', 'ALL'];
+
+const normalizeYear = (yearValue) => {
+  const raw = String(yearValue || '').trim();
+  const map = { '1': 'First', '2': 'Second', '3': 'Third', '4': 'Fourth' };
+  if (raw.toUpperCase() === 'ALL') return 'ALL';
+  if (map[raw]) return map[raw];
+  const cap = raw ? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase() : 'ALL';
+  return ALLOWED_YEARS.includes(cap) ? cap : 'ALL';
+};
+
 const presenceRequestSchema = new mongoose.Schema({
   studentUserId: { type: mongoose.Schema.Types.ObjectId, required: true },
   studentPRN: { type: String, required: true },
@@ -24,9 +37,9 @@ const attendanceSessionSchema = new mongoose.Schema({
   },
   subjectName: { type: String, required: true },
   classScope: {
-    year: { type: String },
-    branch: { type: String },
-    division: { type: String }
+    year: { type: String, enum: ALLOWED_YEARS, default: 'ALL' },
+    branch: { type: String, enum: [IT_DEPARTMENT, 'ALL'], default: IT_DEPARTMENT },
+    division: { type: String, enum: ALLOWED_DIVISIONS, default: 'ALL' }
   },
   attendanceMeta: {
     month: { type: String, default: 'Overall' },
@@ -47,5 +60,15 @@ const attendanceSessionSchema = new mongoose.Schema({
 attendanceSessionSchema.index({ sessionCode: 1 });
 attendanceSessionSchema.index({ status: 1, createdAt: -1 });
 attendanceSessionSchema.index({ 'createdBy.userId': 1, status: 1 });
+
+attendanceSessionSchema.pre('validate', function normalizeClassScope(next) {
+  const scope = this.classScope || {};
+  scope.year = normalizeYear(scope.year);
+  scope.branch = String(scope.branch || '').toUpperCase() === 'ALL' ? 'ALL' : IT_DEPARTMENT;
+  const normalizedDivision = String(scope.division || 'ALL').trim().toUpperCase();
+  scope.division = ALLOWED_DIVISIONS.includes(normalizedDivision) ? normalizedDivision : 'ALL';
+  this.classScope = scope;
+  next();
+});
 
 module.exports = mongoose.model('AttendanceSession', attendanceSessionSchema);

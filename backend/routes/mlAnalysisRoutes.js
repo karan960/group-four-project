@@ -3,6 +3,7 @@ const router = express.Router();
 const axios = require('axios');
 const Student = require('../models/Student');
 const Faculty = require('../models/Faculty');
+const MLTrainingRun = require('../models/MLTrainingRun');
 
 const RAW_ML_API_URL = process.env.ML_API_URL || 'http://localhost:5001/api/ml/performance';
 const ML_API_URL = RAW_ML_API_URL.includes('/api/ml/performance')
@@ -12,17 +13,25 @@ const ML_API_URL = RAW_ML_API_URL.includes('/api/ml/performance')
 const FULL_ANALYSIS_CACHE_TTL_MS = Number(process.env.FULL_ANALYSIS_CACHE_TTL_MS || 5 * 60 * 1000);
 const fullStudentAnalysisCache = new Map();
 const fullStudentAnalysisInFlight = new Map();
+const IT_DEPARTMENT = 'Information Technology';
 
 const buildStudentQuery = ({ year, branch, division }) => {
-  const query = { isActive: true };
+  const query = { isActive: true, branch: IT_DEPARTMENT };
   if (year) query.year = year;
-  if (branch) query.branch = branch;
+  if (branch) query.branch = IT_DEPARTMENT;
   if (division) query.division = division;
   return query;
 };
 
+const normalizeTrainingScope = ({ year, branch, division } = {}) => ({
+  year: year || 'All',
+  branch: branch || 'All',
+  division: division || 'All'
+});
+
 const ensureAdmin = (req, res) => {
-  if (!req.user || req.user.role !== 'admin') {
+  const role = String(req?.user?.role || '').trim().toLowerCase();
+  if (role !== 'admin') {
     res.status(403).json({ error: 'Admin access required' });
     return false;
   }
@@ -65,6 +74,50 @@ const getStatusFromStudentSnapshot = (student) => {
     return { status: 'Average', riskLevel: 'Medium Risk' };
   }
   return { status: 'Needs Attention', riskLevel: 'High Risk' };
+};
+
+const getPerformanceScoreFromSnapshot = (student) => {
+  const cgpa = Number(student?.cgpa || 0);
+  const attendance = Number(student?.overallAttendance || 0);
+  const backlogCount = Number(student?.backlogs || 0);
+  const placementStatus = String(student?.placementStatus || '').toLowerCase();
+
+  const placementBonus = placementStatus === 'placed' ? 6 : placementStatus === 'eligible' ? 3 : 0;
+  const score = (cgpa / 10) * 70 + (attendance / 100) * 25 - Math.min(10, backlogCount) * 2 + placementBonus;
+  return Number(Math.max(0, Math.min(100, score)).toFixed(2));
+};
+
+const mapStudentWithPerformance = (student) => {
+  const { status, riskLevel } = getStatusFromStudentSnapshot(student);
+  const performanceScore = getPerformanceScoreFromSnapshot(student);
+  return {
+    _id: student._id,
+    prn: student.prn,
+    studentName: student.studentName,
+    year: student.year,
+    branch: student.branch || student.department || '',
+    division: student.division,
+    cgpa: student.cgpa || 0,
+    overallAttendance: student.overallAttendance || 0,
+    placementStatus: student.placementStatus || 'Not Eligible',
+    companyName: student.companyName || '',
+    package: student.package || null,
+    performanceScore,
+    status,
+    riskLevel
+  };
+};
+
+const getTopPerformersByScope = async ({ year, branch, division, limit = 5 } = {}) => {
+  const topperLimit = Math.max(1, Math.min(20, Number(limit || 5)));
+  const scopedQuery = buildStudentQuery({ year, branch, division });
+  const students = await Student.find(scopedQuery).sort({ studentName: 1 });
+  const topPerformers = students
+    .map(mapStudentWithPerformance)
+    .sort((a, b) => Number(b.performanceScore || 0) - Number(a.performanceScore || 0))
+    .slice(0, topperLimit);
+
+  return { topPerformers, totalCandidates: students.length };
 };
 
 const getCachedFullStudentAnalysis = (studentId) => {
@@ -445,11 +498,55 @@ router.get('/institution-stats', async (req, res) => {
 router.get('/model-info', async (req, res) => {
   try {
     const response = await axios.get(`${ML_API_URL}/model-info`);
-    res.json(response.data);
+    const latestRun = await MLTrainingRun.findOne({ status: 'completed' })
+      .sort({ trainedAt: -1 })
+      .lean();
+
+    res.json({
+      ...response.data,
+      trainingScope: latestRun?.scope || null,
+      lastTrainedBy: latestRun?.trainedBy?.username || null,
+      lastRunId: latestRun?._id || null,
+      lastTrained: latestRun?.trainedAt || response.data?.lastTrained || null
+    });
   } catch (error) {
     console.error('Error fetching model info:', error.message);
     res.status(500).json({
       error: 'Failed to fetch model info',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET recorded model training history
+ * GET /api/ml-analysis/training-history
+ */
+router.get('/training-history', async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return;
+
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit || 20)));
+    const { year, branch, division } = req.query;
+
+    const query = {};
+    if (year && year !== 'All') query['scope.year'] = year;
+    if (branch && branch !== 'All') query['scope.branch'] = branch;
+    if (division && division !== 'All') query['scope.division'] = division;
+
+    const runs = await MLTrainingRun.find(query)
+      .sort({ trainedAt: -1 })
+      .limit(limit)
+      .lean();
+
+    res.json({
+      total: runs.length,
+      runs
+    });
+  } catch (error) {
+    console.error('Error fetching training history:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch training history',
       details: error.message
     });
   }
@@ -463,7 +560,47 @@ router.post('/train-model', async (req, res) => {
   try {
     if (!ensureAdmin(req, res)) return;
 
-    const { year, branch, division } = req.body || {};
+    const { year, branch, division, forceRetrain = false } = req.body || {};
+    const normalizedScope = normalizeTrainingScope({ year, branch, division });
+
+    const existingRun = await MLTrainingRun.findOne({
+      status: 'completed',
+      'scope.year': normalizedScope.year,
+      'scope.branch': normalizedScope.branch,
+      'scope.division': normalizedScope.division
+    })
+      .sort({ trainedAt: -1 })
+      .lean();
+
+    const hasSuspiciousPerfectMetrics =
+      !!existingRun &&
+      Number(existingRun.metrics?.accuracy || 0) >= 0.999 &&
+      Number(existingRun.metrics?.precision || 0) >= 0.999 &&
+      Number(existingRun.metrics?.recall || 0) >= 0.999 &&
+      Number(existingRun.metrics?.f1Score || 0) >= 0.999;
+
+    if (existingRun && !forceRetrain && !hasSuspiciousPerfectMetrics) {
+      return res.json({
+        success: true,
+        alreadyTrained: true,
+        message: 'Model already trained for this scope. Using recorded training.',
+        metrics: {
+          accuracy: existingRun.metrics?.accuracy || 0,
+          precision: existingRun.metrics?.precision || 0,
+          recall: existingRun.metrics?.recall || 0,
+          f1_score: existingRun.metrics?.f1Score || 0
+        },
+        rows_used: existingRun.rowsUsed || 0,
+        last_trained: existingRun.trainedAt,
+        trainingScope: {
+          ...normalizedScope,
+          totalStudents: existingRun.rowsUsed || 0
+        },
+        trainedBy: existingRun.trainedBy?.username || null,
+        runId: existingRun._id
+      });
+    }
+
     const students = await Student.find(buildStudentQuery({ year, branch, division }));
 
     if (!students.length) {
@@ -473,17 +610,64 @@ router.post('/train-model', async (req, res) => {
     const studentsData = students.map(formatStudentData);
     const response = await axios.post(`${ML_API_URL}/train-db`, { students: studentsData });
 
+    const metrics = response.data?.metrics || {};
+    const features = Array.isArray(response.data?.features) ? response.data.features : [];
+    const rowsUsed = Number(response.data?.rows_used || students.length || 0);
+
+    const runRecord = await MLTrainingRun.create({
+      scope: normalizedScope,
+      status: 'completed',
+      rowsUsed,
+      featuresUsed: features.length,
+      metrics: {
+        accuracy: Number(metrics.accuracy || 0),
+        precision: Number(metrics.precision || 0),
+        recall: Number(metrics.recall || 0),
+        f1Score: Number(metrics.f1_score || 0)
+      },
+      trainedAt: response.data?.last_trained ? new Date(response.data.last_trained) : new Date(),
+      trainedBy: {
+        userId: req.user?.id || req.user?._id || '',
+        username: req.user?.username || 'admin'
+      },
+      modelMeta: {
+        modelType: response.data?.model_type || '',
+        modelPath: response.data?.model_path || ''
+      },
+      notes: forceRetrain ? 'Forced retraining executed by admin' : ''
+    });
+
     res.json({
       ...response.data,
+      alreadyTrained: false,
+      runId: runRecord._id,
       trainingScope: {
         totalStudents: students.length,
-        year: year || 'All',
-        branch: branch || 'All',
-        division: division || 'All'
-      }
+        ...normalizedScope
+      },
+      trainedBy: req.user?.username || 'admin'
     });
   } catch (error) {
     console.error('Error training model:', error.message);
+
+    const { year, branch, division } = req.body || {};
+    const normalizedScope = normalizeTrainingScope({ year, branch, division });
+    try {
+      await MLTrainingRun.create({
+        scope: normalizedScope,
+        status: 'failed',
+        rowsUsed: 0,
+        featuresUsed: 0,
+        trainedBy: {
+          userId: req.user?.id || req.user?._id || '',
+          username: req.user?.username || 'admin'
+        },
+        notes: error.message || 'Training failed'
+      });
+    } catch (recordError) {
+      console.error('Failed to persist failed training run:', recordError.message);
+    }
+
     res.status(500).json({
       error: 'Failed to train model',
       details: error.message
@@ -603,10 +787,14 @@ router.get('/faculty/:facultyId/subject-analysis', async (req, res) => {
     }
 
     const studentsData = students.map(formatStudentData);
-    const subjects = faculty.assignedSubjects || [];
+    
+    // Combine both assigned subjects and manually added subjects
+    const assignedSubjects = faculty.assignedSubjects || [];
+    const manuallyAddedSubjects = faculty.manuallyAddedSubjects || [];
+    const allSubjects = [...assignedSubjects, ...manuallyAddedSubjects];
 
     const subjectResults = [];
-    for (const subject of subjects) {
+    for (const subject of allSubjects) {
       const subjectName = subject.subjectName || 'All Subjects';
       const response = await axios.post(`${ML_API_URL}/subject-analysis`, {
         subject_name: subjectName,
@@ -614,7 +802,8 @@ router.get('/faculty/:facultyId/subject-analysis', async (req, res) => {
       });
       subjectResults.push({
         subject: subjectName,
-        stats: response.data?.statistics || {}
+        stats: response.data?.statistics || {},
+        isManuallyAdded: !assignedSubjects.find(s => s.subjectCode === subject.subjectCode)
       });
     }
 
@@ -625,7 +814,8 @@ router.get('/faculty/:facultyId/subject-analysis', async (req, res) => {
       });
       subjectResults.push({
         subject: 'All Subjects',
-        stats: fallback.data?.statistics || {}
+        stats: fallback.data?.statistics || {},
+        isManuallyAdded: false
       });
     }
 
@@ -654,7 +844,7 @@ router.get('/faculty/:facultyId/subject-analysis', async (req, res) => {
 router.get('/faculty/:facultyId/students-analysis', async (req, res) => {
   try {
     const { facultyId } = req.params;
-    const { year, division } = req.query;
+    const { year, division, branch } = req.query;
     let faculty = null;
     if (facultyId.match(/^[0-9a-fA-F]{24}$/)) {
       faculty = await Faculty.findById(facultyId);
@@ -689,23 +879,8 @@ router.get('/faculty/:facultyId/students-analysis', async (req, res) => {
       return res.status(404).json({ error: 'No students found for this faculty scope' });
     }
 
-    const analyzedStudents = students.map((student) => {
-      const { status, riskLevel } = getStatusFromStudentSnapshot(student);
-      return {
-        _id: student._id,
-        prn: student.prn,
-        studentName: student.studentName,
-        year: student.year,
-        division: student.division,
-        cgpa: student.cgpa || 0,
-        overallAttendance: student.overallAttendance || 0,
-        placementStatus: student.placementStatus || 'Not Eligible',
-        companyName: student.companyName || '',
-        package: student.package || null,
-        status,
-        riskLevel
-      };
-    });
+    const analyzedStudents = students.map(mapStudentWithPerformance);
+    const { topPerformers } = await getTopPerformersByScope({ year, limit: 5 });
 
     res.json({
       success: true,
@@ -715,12 +890,49 @@ router.get('/faculty/:facultyId/students-analysis', async (req, res) => {
         department: faculty.department
       },
       totalStudents: analyzedStudents.length,
-      students: analyzedStudents
+      students: analyzedStudents,
+      topPerformers
     });
   } catch (error) {
     console.error('Error fetching faculty students analysis list:', error.message);
     res.status(500).json({
       error: 'Failed to fetch faculty students analysis',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * GET institution toppers list for admin ML panel
+ * GET /api/ml-analysis/top-performers
+ */
+router.get('/top-performers', async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return;
+
+    const { year, branch, division, limit } = req.query;
+    const { topPerformers, totalCandidates } = await getTopPerformersByScope({
+      year: year || undefined,
+      branch: branch || undefined,
+      division: division || undefined,
+      limit: limit || 5
+    });
+
+    return res.json({
+      success: true,
+      totalCandidates,
+      count: topPerformers.length,
+      scope: {
+        year: year || 'All',
+        branch: branch || 'All',
+        division: division || 'All'
+      },
+      topPerformers
+    });
+  } catch (error) {
+    console.error('Error fetching top performers:', error.message);
+    return res.status(500).json({
+      error: 'Failed to fetch top performers',
       details: error.message
     });
   }

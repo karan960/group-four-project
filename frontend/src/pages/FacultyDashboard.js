@@ -201,9 +201,9 @@ const FacultyDashboard = () => {
     title: '',
     code: '',
     description: '',
-    year: '',
-    branch: '',
-    division: '',
+    year: 'First',
+    branch: 'Information Technology',
+    division: 'A',
     semester: '',
     file: null
   });
@@ -230,7 +230,22 @@ const FacultyDashboard = () => {
   const [facultySubjectAnalysis, setFacultySubjectAnalysis] = useState([]);
   const [subjectAnalysisLoading, setSubjectAnalysisLoading] = useState(false);
   const [subjectAnalysisError, setSubjectAnalysisError] = useState('');
+  const [assignedSubjects, setAssignedSubjects] = useState([]);
+  const [manuallyAddedSubjects, setManuallyAddedSubjects] = useState([]);
+  const [availableSubjects, setAvailableSubjects] = useState([]);
+  const [availableSubjectsLoading, setAvailableSubjectsLoading] = useState(false);
+  const [manualSubjectForm, setManualSubjectForm] = useState({
+    subjectCode: '',
+    subjectName: '',
+    year: 'First',
+    division: 'A',
+    semester: ''
+  });
+  const [addSubjectLoading, setAddSubjectLoading] = useState(false);
+  const [addSubjectStatus, setAddSubjectStatus] = useState('');
   const [facultyStudentsAnalysis, setFacultyStudentsAnalysis] = useState([]);
+  const [topPerformers, setTopPerformers] = useState([]);
+  const [studentsYearFilter, setStudentsYearFilter] = useState('All');
   const [studentsAnalysisLoading, setStudentsAnalysisLoading] = useState(false);
   const [studentsAnalysisError, setStudentsAnalysisError] = useState('');
   const [selectedStudentAnalysis, setSelectedStudentAnalysis] = useState(null);
@@ -573,6 +588,8 @@ const FacultyDashboard = () => {
   useEffect(() => {
     if (activeTab === 'Subjects') {
       fetchFacultySubjectAnalysis();
+      fetchManualSubjects();
+      fetchAvailableSubjects();
     }
     if (activeTab === 'Students') {
       fetchFacultyStudentsAnalysis({ showLoading: facultyStudentsAnalysis.length === 0 });
@@ -590,7 +607,7 @@ const FacultyDashboard = () => {
     if (activeTab === 'Placements') {
       fetchPastPlacements();
     }
-  }, [activeTab, facultyData?._id]);
+  }, [activeTab, facultyData?._id, studentsYearFilter]);
 
   useEffect(() => {
     if (activeTab !== 'MarkAttendance') return undefined;
@@ -622,6 +639,118 @@ const FacultyDashboard = () => {
     }
   };
 
+  const fetchManualSubjects = async () => {
+    try {
+      const facultyIdentifier = facultyData?.facultyId || user?.referenceId;
+      if (!facultyIdentifier) return;
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/faculty/${facultyIdentifier}/manual-subjects`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setManuallyAddedSubjects(response.data?.manuallyAddedSubjects || []);
+      setAssignedSubjects(response.data?.assignedSubjects || []);
+    } catch (error) {
+      console.error('Error fetching manual subjects:', error);
+    }
+  };
+
+  const fetchAvailableSubjects = async () => {
+    try {
+      const facultyIdentifier = facultyData?.facultyId || user?.referenceId;
+      if (!facultyIdentifier) return;
+      
+      setAvailableSubjectsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/api/faculty/${facultyIdentifier}/available-subjects`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAvailableSubjects(response.data?.availableSubjects || []);
+    } catch (error) {
+      console.error('Error fetching available subjects:', error);
+      setAvailableSubjects([]);
+    } finally {
+      setAvailableSubjectsLoading(false);
+    }
+  };
+
+  const handleSelectSubject = (subjectCode, subjectName) => {
+    setManualSubjectForm({
+      ...manualSubjectForm,
+      subjectCode,
+      subjectName
+    });
+  };
+
+  const handleAddManualSubject = async (e) => {
+    e.preventDefault();
+    try {
+      if (!manualSubjectForm.subjectCode || !manualSubjectForm.subjectName) {
+        setAddSubjectStatus('[ERR] Subject code and name are required!');
+        return;
+      }
+
+      const facultyIdentifier = facultyData?.facultyId || user?.referenceId;
+      if (!facultyIdentifier) return;
+
+      setAddSubjectLoading(true);
+      setAddSubjectStatus('');
+      const token = localStorage.getItem('token');
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/faculty/${facultyIdentifier}/manual-subjects`,
+        manualSubjectForm,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setAddSubjectStatus('[OK] Subject added successfully!');
+      setManualSubjectForm({
+        subjectCode: '',
+        subjectName: '',
+        year: 'First',
+        division: 'A',
+        semester: ''
+      });
+      
+      // Refresh the subjects list and analysis
+      fetchManualSubjects();
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      fetchFacultySubjectAnalysis();
+    } catch (error) {
+      setAddSubjectStatus('[ERR] ' + (error.response?.data?.message || error.message));
+    } finally {
+      setAddSubjectLoading(false);
+    }
+  };
+
+  const handleRemoveManualSubject = async (subjectCode) => {
+    if (!window.confirm('Are you sure you want to remove this subject?')) return;
+
+    try {
+      const facultyIdentifier = facultyData?.facultyId || user?.referenceId;
+      if (!facultyIdentifier) return;
+
+      const token = localStorage.getItem('token');
+
+      await axios.delete(
+        `${API_BASE_URL}/api/faculty/${facultyIdentifier}/manual-subjects/${subjectCode}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setAddSubjectStatus('[OK] Subject removed successfully!');
+      
+      // Refresh the subjects list and analysis
+      fetchManualSubjects();
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      fetchFacultySubjectAnalysis();
+    } catch (error) {
+      setAddSubjectStatus('[ERR] ' + (error.response?.data?.message || error.message));
+    }
+  };
+
   const fetchFacultyStudentsAnalysisList = async ({ showLoading = true } = {}) => {
     const facultyIdentifier = facultyData?._id || facultyData?.facultyId || user?.referenceId;
     if (!facultyIdentifier) {
@@ -635,8 +764,21 @@ const FacultyDashboard = () => {
     try {
       setStudentsAnalysisError('');
       const token = localStorage.getItem('token');
+
+      const params = new URLSearchParams();
+      if (studentsYearFilter && studentsYearFilter !== 'All') {
+        params.set('year', studentsYearFilter);
+      }
+      const analysisUrl = `${API_BASE_URL}/api/ml-analysis/faculty/${facultyIdentifier}/students-analysis${params.toString() ? `?${params.toString()}` : ''}`;
+
+      const toTopPerformers = (students = []) => (
+        [...students]
+          .sort((a, b) => Number(b.performanceScore || 0) - Number(a.performanceScore || 0))
+          .slice(0, 5)
+      );
+
       const response = await fetchWithCacheSWR({
-        url: `${API_BASE_URL}/api/ml-analysis/faculty/${facultyIdentifier}/students-analysis`,
+        url: analysisUrl,
         method: 'get',
         headers: { Authorization: `Bearer ${token}` },
         ttlMs: 2 * 60 * 1000,
@@ -645,14 +787,23 @@ const FacultyDashboard = () => {
         onFreshData: (freshData) => {
           const freshStudents = Array.isArray(freshData?.students) ? freshData.students : [];
           setFacultyStudentsAnalysis(freshStudents);
+          const freshTop = Array.isArray(freshData?.topPerformers) && freshData.topPerformers.length
+            ? freshData.topPerformers
+            : toTopPerformers(freshStudents);
+          setTopPerformers(freshTop);
         }
       });
 
       const students = Array.isArray(response.data?.students) ? response.data.students : [];
       setFacultyStudentsAnalysis(students);
+      const responseTop = Array.isArray(response.data?.topPerformers) && response.data.topPerformers.length
+        ? response.data.topPerformers
+        : toTopPerformers(students);
+      setTopPerformers(responseTop);
       return students;
     } catch (error) {
       setStudentsAnalysisError(error.response?.data?.error || error.message);
+      setTopPerformers([]);
       return [];
     } finally {
       if (showLoading) {
@@ -668,6 +819,7 @@ const FacultyDashboard = () => {
       console.error('Error fetching faculty students analysis list:', error);
       setStudentsAnalysisError(error.response?.data?.error || error.message);
       setFacultyStudentsAnalysis([]);
+      setTopPerformers([]);
     }
   };
 
@@ -928,7 +1080,16 @@ const FacultyDashboard = () => {
           'Content-Type': 'multipart/form-data'
         }
       });
-      setCourseForm({ title: '', code: '', description: '', year: '', branch: '', division: '', semester: '', file: null });
+      setCourseForm({
+        title: '',
+        code: '',
+        description: '',
+        year: 'First',
+        branch: 'Information Technology',
+        division: 'A',
+        semester: '',
+        file: null
+      });
       setCourses((prev) => [response.data.course, ...prev]);
       await fetchRecentActivities();
     } catch (error) {
@@ -1752,28 +1913,235 @@ const FacultyDashboard = () => {
                 <div className="card-body">
                   {activeTab === 'Subjects' && (
                     <div>
-                      {subjectAnalysisLoading ? (
-                        <div style={{ textAlign: 'center', padding: '1rem' }}>
-                          <div className="spinner"></div>
-                          Loading subject analysis...
+                      <div className="card" style={{ marginBottom: '1rem' }}>
+                        <div className="card-header">
+                          <h2 className="card-title">Add Subject Manually</h2>
                         </div>
-                      ) : subjectAnalysisError ? (
-                        <p style={{ color: 'var(--danger)' }}>{subjectAnalysisError}</p>
-                      ) : facultySubjectAnalysis.length === 0 ? (
-                        <p style={{ color: 'var(--muted)' }}>No subject analysis available yet.</p>
-                      ) : (
-                        <div className="subjects-grid">
-                          {facultySubjectAnalysis.map((subject, i) => (
-                            <div key={i} className="subject-card">
-                              <h4>{subject.subject}</h4>
-                              <p className="stat-label">Avg Marks: {subject.stats?.average_marks ?? 0}</p>
-                              <p className="stat-label">Highest: {subject.stats?.highest_marks ?? 0}</p>
-                              <p className="stat-label">Lowest: {subject.stats?.lowest_marks ?? 0}</p>
-                              <p className="stat-label">Students: {subject.stats?.total_students ?? 0}</p>
+                        <div className="card-body">
+                          {availableSubjectsLoading ? (
+                            <div style={{ textAlign: 'center', padding: '1rem' }}>
+                              <div className="spinner"></div>
+                              Loading available subjects...
                             </div>
-                          ))}
+                          ) : availableSubjects.length > 0 ? (
+                            <div style={{ marginBottom: '1.5rem' }}>
+                              <label style={{ display: 'block', marginBottom: '0.75rem', fontWeight: 'bold' }}>
+                                Quick Select from Available Subjects
+                              </label>
+                              <div style={{ 
+                                display: 'grid', 
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                                gap: '0.5rem',
+                                marginBottom: '1rem'
+                              }}>
+                                {availableSubjects.map((subject, idx) => (
+                                  <button
+                                    key={idx}
+                                    className="btn"
+                                    style={{
+                                      backgroundColor: 
+                                        manualSubjectForm.subjectCode === subject.subjectCode 
+                                          ? 'var(--primary)' 
+                                          : 'var(--muted-bg)',
+                                      color: 
+                                        manualSubjectForm.subjectCode === subject.subjectCode 
+                                          ? 'white' 
+                                          : 'inherit',
+                                      border: '1px solid var(--border)',
+                                      padding: '0.5rem',
+                                      fontSize: '0.85rem',
+                                      textAlign: 'left',
+                                      whiteSpace: 'normal',
+                                      height: 'auto'
+                                    }}
+                                    onClick={() => handleSelectSubject(subject.subjectCode, subject.subjectName)}
+                                  >
+                                    <strong>{subject.subjectCode}</strong> - {subject.subjectName}
+                                  </button>
+                                ))}
+                              </div>
+                              <hr style={{ margin: '1rem 0' }} />
+                            </div>
+                          ) : null}
+
+                          <form onSubmit={handleAddManualSubject}>
+                            <div className="form-row">
+                              <div className="form-group">
+                                <label>Subject Code *</label>
+                                <input
+                                  className="form-control"
+                                  placeholder="Select from above or enter manually"
+                                  value={manualSubjectForm.subjectCode}
+                                  onChange={(e) => setManualSubjectForm({ ...manualSubjectForm, subjectCode: e.target.value })}
+                                  required
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label>Subject Name *</label>
+                                <input
+                                  className="form-control"
+                                  placeholder="Select from above or enter manually"
+                                  value={manualSubjectForm.subjectName}
+                                  onChange={(e) => setManualSubjectForm({ ...manualSubjectForm, subjectName: e.target.value })}
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div className="form-row">
+                              <div className="form-group">
+                                <label>Year</label>
+                                <select
+                                  className="form-control"
+                                  value={manualSubjectForm.year}
+                                  onChange={(e) => setManualSubjectForm({ ...manualSubjectForm, year: e.target.value })}
+                                >
+                                  <option value="First">First</option>
+                                  <option value="Second">Second</option>
+                                  <option value="Third">Third</option>
+                                  <option value="Fourth">Fourth</option>
+                                </select>
+                              </div>
+                              <div className="form-group">
+                                <label>Division</label>
+                                <select
+                                  className="form-control"
+                                  value={manualSubjectForm.division}
+                                  onChange={(e) => setManualSubjectForm({ ...manualSubjectForm, division: e.target.value })}
+                                >
+                                  <option value="A">A</option>
+                                  <option value="B">B</option>
+                                </select>
+                              </div>
+                              <div className="form-group">
+                                <label>Semester</label>
+                                <input
+                                  type="number"
+                                  className="form-control"
+                                  placeholder="e.g., 1, 2"
+                                  value={manualSubjectForm.semester}
+                                  onChange={(e) => setManualSubjectForm({ ...manualSubjectForm, semester: e.target.value })}
+                                />
+                              </div>
+                            </div>
+                            <button
+                              type="submit"
+                              className="btn btn-primary"
+                              disabled={addSubjectLoading}
+                            >
+                              {addSubjectLoading ? 'Adding...' : 'Add Subject'}
+                            </button>
+                            {addSubjectStatus && (
+                              <p style={{
+                                marginTop: '0.5rem',
+                                color: addSubjectStatus.includes('[OK]') ? 'var(--success)' : 'var(--danger)'
+                              }}>
+                                {addSubjectStatus}
+                              </p>
+                            )}
+                          </form>
                         </div>
-                      )}
+                      </div>
+
+                      <div className="card" style={{ marginBottom: '1rem' }}>
+                        <div className="card-header">
+                          <h2 className="card-title">My Subjects (Assigned & Manual)</h2>
+                        </div>
+                        <div className="card-body">
+                          <div style={{ marginBottom: '1.5rem' }}>
+                            <h4 style={{ marginBottom: '0.5rem' }}>Assigned Subjects ({assignedSubjects.length})</h4>
+                            {assignedSubjects.length === 0 ? (
+                              <p style={{ color: 'var(--muted)' }}>No assigned subjects.</p>
+                            ) : (
+                              <div className="subjects-grid">
+                                {assignedSubjects.map((subject, i) => (
+                                  <div key={`assigned-${i}`} className="subject-card" style={{ opacity: 0.9, borderLeft: '4px solid var(--primary)' }}>
+                                    <h4>{subject.subjectName}</h4>
+                                    <p className="stat-label">Code: {subject.subjectCode}</p>
+                                    <p className="stat-label">Year: {subject.year || 'N/A'}</p>
+                                    <p className="stat-label">Division: {subject.division || 'N/A'}</p>
+                                    <p className="stat-label" style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
+                                      <strong>Assigned by Admin</strong>
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <h4 style={{ marginBottom: '0.5rem' }}>Manually Added Subjects ({manuallyAddedSubjects.length})</h4>
+                            {manuallyAddedSubjects.length === 0 ? (
+                              <p style={{ color: 'var(--muted)' }}>No manually added subjects. Add one above to get started!</p>
+                            ) : (
+                              <div className="subjects-grid">
+                                {manuallyAddedSubjects.map((subject, i) => (
+                                  <div key={`manual-${i}`} className="subject-card" style={{ borderLeft: '4px solid var(--warning)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                                      <h4>{subject.subjectName}</h4>
+                                      <button
+                                        className="btn btn-small"
+                                        style={{
+                                          padding: '0.25rem 0.5rem',
+                                          fontSize: '0.8rem',
+                                          backgroundColor: 'var(--danger)',
+                                          color: 'white',
+                                          border: 'none',
+                                          borderRadius: '4px',
+                                          cursor: 'pointer'
+                                        }}
+                                        onClick={() => handleRemoveManualSubject(subject.subjectCode)}
+                                      >
+                                        × Remove
+                                      </button>
+                                    </div>
+                                    <p className="stat-label">Code: {subject.subjectCode}</p>
+                                    <p className="stat-label">Year: {subject.year || 'N/A'}</p>
+                                    <p className="stat-label">Division: {subject.division || 'N/A'}</p>
+                                    <p className="stat-label" style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
+                                      Added: {new Date(subject.addedAt).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="card">
+                        <div className="card-header">
+                          <h2 className="card-title">Subject Analysis</h2>
+                        </div>
+                        <div className="card-body">
+                          {subjectAnalysisLoading ? (
+                            <div style={{ textAlign: 'center', padding: '1rem' }}>
+                              <div className="spinner"></div>
+                              Loading subject analysis...
+                            </div>
+                          ) : subjectAnalysisError ? (
+                            <p style={{ color: 'var(--danger)' }}>{subjectAnalysisError}</p>
+                          ) : facultySubjectAnalysis.length === 0 ? (
+                            <p style={{ color: 'var(--muted)' }}>No subject analysis available yet. Add subjects above to generate analysis.</p>
+                          ) : (
+                            <div className="subjects-grid">
+                              {facultySubjectAnalysis.map((subject, i) => (
+                                <div key={i} className="subject-card" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                                  <h4>{subject.subject}</h4>
+                                  {subject.isManuallyAdded && (
+                                    <span style={{ fontSize: '0.75rem', backgroundColor: 'var(--warning)', color: 'white', padding: '0.25rem 0.5rem', borderRadius: '4px', marginBottom: '0.5rem', display: 'inline-block' }}>
+                                      Manual
+                                    </span>
+                                  )}
+                                  <p className="stat-label">Avg Marks: {subject.stats?.average_marks ?? 0}</p>
+                                  <p className="stat-label">Highest: {subject.stats?.highest_marks ?? 0}</p>
+                                  <p className="stat-label">Lowest: {subject.stats?.lowest_marks ?? 0}</p>
+                                  <p className="stat-label">Students: {subject.stats?.total_students ?? 0}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -1805,27 +2173,35 @@ const FacultyDashboard = () => {
                           <div className="form-row">
                             <div className="form-group">
                               <label>Year *</label>
-                              <input
+                              <select
                                 className="form-control"
                                 value={courseForm.year}
                                 onChange={(e) => setCourseForm({ ...courseForm, year: e.target.value })}
-                              />
+                              >
+                                <option value="First">First</option>
+                                <option value="Second">Second</option>
+                                <option value="Third">Third</option>
+                                <option value="Fourth">Fourth</option>
+                              </select>
                             </div>
                             <div className="form-group">
                               <label>Branch *</label>
                               <input
                                 className="form-control"
                                 value={courseForm.branch}
-                                onChange={(e) => setCourseForm({ ...courseForm, branch: e.target.value })}
+                                readOnly
                               />
                             </div>
                             <div className="form-group">
                               <label>Division *</label>
-                              <input
+                              <select
                                 className="form-control"
                                 value={courseForm.division}
                                 onChange={(e) => setCourseForm({ ...courseForm, division: e.target.value })}
-                              />
+                              >
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                              </select>
                             </div>
                             <div className="form-group">
                               <label>Semester</label>
@@ -2395,6 +2771,63 @@ const FacultyDashboard = () => {
 
                   {activeTab === 'Students' && (
                     <div>
+                      <div className="form-group" style={{ maxWidth: '220px', marginBottom: '0.75rem' }}>
+                        <label>Topper Year</label>
+                        <select
+                          className="form-control"
+                          value={studentsYearFilter}
+                          onChange={(e) => setStudentsYearFilter(e.target.value)}
+                        >
+                          <option value="All">All</option>
+                          <option value="First">First</option>
+                          <option value="Second">Second</option>
+                          <option value="Third">Third</option>
+                          <option value="Fourth">Fourth</option>
+                        </select>
+                      </div>
+
+                      <div className="card" style={{ marginBottom: '1rem' }}>
+                        <div className="card-header">
+                          <h2 className="card-title"><FaChartLine /> Top 5 Performers</h2>
+                        </div>
+                        <div className="card-body">
+                          {topPerformers.length === 0 ? (
+                            <p style={{ color: 'var(--muted)' }}>No topper data available.</p>
+                          ) : (
+                            <div className="table-responsive">
+                              <table className="data-table">
+                                <thead>
+                                  <tr>
+                                    <th>Rank</th>
+                                    <th>Student Name</th>
+                                    <th>PRN</th>
+                                    <th>Year</th>
+                                    <th>Division</th>
+                                    <th>CGPA</th>
+                                    <th>Attendance</th>
+                                    <th>Score</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {topPerformers.map((student, idx) => (
+                                    <tr key={`top-${student._id || student.prn || idx}`}>
+                                      <td><strong>#{idx + 1}</strong></td>
+                                      <td>{student.studentName}</td>
+                                      <td>{student.prn}</td>
+                                      <td>{student.year}</td>
+                                      <td>{student.division}</td>
+                                      <td>{Number(student.cgpa || 0).toFixed(2)}</td>
+                                      <td>{Number(student.overallAttendance || 0).toFixed(1)}%</td>
+                                      <td><strong>{Number(student.performanceScore || 0).toFixed(2)}</strong></td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                       {studentsAnalysisLoading ? (
                         <div style={{ textAlign: 'center', padding: '1rem' }}>
                           <div className="spinner"></div>
@@ -2416,6 +2849,7 @@ const FacultyDashboard = () => {
                                 <th>Placement</th>
                                 <th>Company</th>
                                 <th>Package</th>
+                                <th>Score</th>
                                 <th>Status</th>
                                 <th>Action</th>
                               </tr>
@@ -2430,6 +2864,7 @@ const FacultyDashboard = () => {
                                   <td>{student.placementStatus || 'Not Eligible'}</td>
                                   <td>{student.companyName || '-'}</td>
                                   <td>{student.package ?? '-'}</td>
+                                  <td>{Number(student.performanceScore || 0).toFixed(2)}</td>
                                   <td>{student.status}</td>
                                   <td>
                                     <button

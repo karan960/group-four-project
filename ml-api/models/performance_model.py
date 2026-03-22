@@ -13,9 +13,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from sklearn.base import clone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import LeaveOneOut, train_test_split
 from sklearn.preprocessing import StandardScaler
 
 try:
@@ -139,7 +140,10 @@ class StudentPerformanceAnalyzer:
         numeric_cols = [
             "in_sem_total", "end_sem_total", "in_sem_percentage", "end_sem_percentage",
             "overall_attendance", "theory_attendance", "practical_attendance",
-            "theory_marks", "practical_marks", "cgpa", "backlogs",
+            "theory_marks", "practical_marks", "cgpa",
+            "total_credits_earned", "avg_credits_per_sem", "attendance_consistency",
+            "sgpa_mean", "sgpa_std", "sgpa_trend", "current_semester",
+            "credit_load_ratio", "credits_progress_ratio", "marks_consistency", "marks_trend",
         ]
 
         # Add fallback derivations from subject style columns
@@ -173,17 +177,39 @@ class StudentPerformanceAnalyzer:
             out[["in_sem_percentage", "end_sem_percentage"]].mean(axis=1)
         )
 
-        # Requested engineered features
+        # Engineered features from requested signals only: marks, attendance, credits, cgpa.
         out["Attendance_Marks_Ratio"] = out["overall_attendance"].fillna(0) / (out["overall_percentage"].fillna(0) + 1e-6)
-
-        theory_base = out["theory_attendance"].fillna(out["theory_marks"])
-        practical_base = out["practical_attendance"].fillna(out["practical_marks"])
-        out["Theory_Practical_Ratio"] = theory_base.fillna(0) / (practical_base.fillna(0) + 1e-6)
-
+        theory_base = out["theory_attendance"].fillna(0)
+        practical_base = out["practical_attendance"].fillna(0)
+        out["Theory_Practical_Ratio"] = theory_base / (practical_base + 1e-6)
         out["INSEM_Weight"] = out["in_sem_total"].fillna(0) / (out["total_marks"].fillna(0) + 1e-6)
 
-        # Performance label
-        out["performance_label"] = out["overall_percentage"].fillna(0).apply(self.label_performance)
+        out["avg_credits_per_sem"] = out["avg_credits_per_sem"].fillna(0)
+        out["credit_load_ratio"] = out["total_credits_earned"].fillna(0) / ((out["current_semester"].fillna(1) * 20) + 1e-6)
+
+        # Target label from the same allowed signals, using weighted composite.
+        composite_score = (
+            out["cgpa"].fillna(0) * 10 * 0.45
+            + out["overall_attendance"].fillna(0) * 0.25
+            + out["overall_percentage"].fillna(0) * 0.20
+            + np.clip(out["credit_load_ratio"].fillna(0), 0, 1.5) * 100 * 0.10
+        )
+
+        # Prefer quantile labels for more balanced classes and better generalization.
+        quantile_bins = pd.qcut(composite_score.rank(method="first"), q=4, labels=self.LABELS, duplicates="drop")
+        if quantile_bins.nunique() >= 2:
+            out["performance_label"] = quantile_bins.astype(str)
+        else:
+            def _to_label(val: float) -> str:
+                if val < 50:
+                    return "Poor"
+                if val < 65:
+                    return "Average"
+                if val < 80:
+                    return "Good"
+                return "Excellent"
+
+            out["performance_label"] = composite_score.apply(_to_label)
 
         # Missing values handling
         num_cols = out.select_dtypes(include=[np.number]).columns
@@ -193,14 +219,27 @@ class StudentPerformanceAnalyzer:
         return out
 
     def select_features(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+        # Use only requested signal families: semester marks, attendance, credits, cgpa.
         preferred = [
+            "cgpa",
             "overall_attendance",
             "in_sem_total",
             "end_sem_total",
             "in_sem_percentage",
             "end_sem_percentage",
-            "cgpa",
-            "backlogs",
+            "theory_attendance",
+            "practical_attendance",
+            "total_credits_earned",
+            "avg_credits_per_sem",
+            "current_semester",
+            "sgpa_mean",
+            "sgpa_std",
+            "sgpa_trend",
+            "attendance_consistency",
+            "credit_load_ratio",
+            "credits_progress_ratio",
+            "marks_consistency",
+            "marks_trend",
             "Attendance_Marks_Ratio",
             "Theory_Practical_Ratio",
             "INSEM_Weight",
@@ -225,43 +264,68 @@ class StudentPerformanceAnalyzer:
         df = self.feature_engineering(source_df)
         x, y = self.select_features(df)
 
-        # Some real-world student batches are very small or low-variance.
-        # Create a fallback label distribution so training can still proceed.
-        if y.nunique() < 2:
-            score = (
-                (df["cgpa"].fillna(0) * 10 * 0.5)
-                + (df["overall_attendance"].fillna(0) * 0.35)
-                + ((100 - np.clip(df["backlogs"].fillna(0) * 12, 0, 100)) * 0.15)
-            )
-
-            # Try quantile binning first.
-            try:
-                binned = pd.qcut(score.rank(method="first"), q=min(4, max(2, int(score.nunique()))), labels=False, duplicates="drop")
-                label_map = {0: "Poor", 1: "Average", 2: "Good", 3: "Excellent"}
-                df["performance_label"] = binned.map(lambda idx: label_map.get(int(idx), "Average"))
-            except Exception:
-                # If qcut fails, use median split to guarantee at least two buckets when possible.
-                med = float(score.median())
-                df["performance_label"] = np.where(score >= med, "Good", "Average")
-
-            y = df["performance_label"].copy()
-
         if y.nunique() < 2:
             raise ValueError("Training needs more variation in student data (at least 2 performance groups)")
 
         min_class_count = int(y.value_counts().min()) if len(y) else 0
 
         if len(df) < 6:
-            # For tiny batches, avoid brittle split failures and still keep model usable.
-            x_train = x.copy()
-            y_train = y.copy()
-            x_train_scaled = self.scaler.fit_transform(x_train)
-            self.model.fit(x_train_scaled, y_train)
-            y_pred = self.model.predict(x_train_scaled)
-            accuracy = accuracy_score(y_train, y_pred)
-            precision, recall, f1, _ = precision_recall_fscore_support(
-                y_train, y_pred, average="weighted", zero_division=0
-            )
+            # Use leave-one-out validation for tiny batches so reported metrics are not
+            # computed on the exact same rows used for fitting.
+            loo = LeaveOneOut()
+            y_true: List[str] = []
+            y_pred: List[str] = []
+
+            for train_idx, test_idx in loo.split(x):
+                x_train = x.iloc[train_idx]
+                y_train = y.iloc[train_idx]
+                x_test = x.iloc[test_idx]
+                y_test = y.iloc[test_idx]
+
+                # Skip fold if training side has only one class (cannot learn class boundary).
+                if y_train.nunique() < 2:
+                    continue
+
+                fold_scaler = StandardScaler()
+                fold_model = clone(self.model)
+                x_train_scaled = fold_scaler.fit_transform(x_train)
+                x_test_scaled = fold_scaler.transform(x_test)
+                fold_model.fit(x_train_scaled, y_train)
+
+                pred = fold_model.predict(x_test_scaled)
+                y_true.extend(y_test.astype(str).tolist())
+                y_pred.extend(pred.astype(str).tolist())
+
+            if y_true:
+                accuracy = accuracy_score(y_true, y_pred)
+                precision, recall, f1, _ = precision_recall_fscore_support(
+                    y_true, y_pred, average="weighted", zero_division=0
+                )
+            else:
+                # Fallback when LOO folds are not trainable due to extreme class sparsity.
+                x_train, x_test, y_train, y_test = train_test_split(
+                    x,
+                    y,
+                    test_size=max(1, int(round(len(df) * 0.34))) / len(df),
+                    random_state=42,
+                    stratify=y if min_class_count >= 2 else None,
+                )
+
+                fold_scaler = StandardScaler()
+                fold_model = clone(self.model)
+                x_train_scaled = fold_scaler.fit_transform(x_train)
+                x_test_scaled = fold_scaler.transform(x_test)
+                fold_model.fit(x_train_scaled, y_train)
+                pred = fold_model.predict(x_test_scaled)
+
+                accuracy = accuracy_score(y_test, pred) if len(y_test) else 0.0
+                precision, recall, f1, _ = precision_recall_fscore_support(
+                    y_test, pred, average="weighted", zero_division=0
+                ) if len(y_test) else (0.0, 0.0, 0.0, None)
+
+            # Fit final deployable model on full dataset after computing validation metrics.
+            x_all_scaled = self.scaler.fit_transform(x)
+            self.model.fit(x_all_scaled, y)
         else:
             can_stratify = min_class_count >= 2
             test_size = 0.2 if len(df) >= 10 else 0.34
@@ -287,6 +351,10 @@ class StudentPerformanceAnalyzer:
             precision, recall, f1, _ = precision_recall_fscore_support(
                 y_test, y_pred, average="weighted", zero_division=0
             ) if len(y_test) else (0.0, 0.0, 0.0, None)
+
+            # Fit final deployable model on full dataset after computing validation metrics.
+            x_all_scaled = self.scaler.fit_transform(x)
+            self.model.fit(x_all_scaled, y)
 
         importances = getattr(self.model, "feature_importances_", np.zeros(len(self.feature_columns)))
         self.feature_importance = {
@@ -794,26 +862,74 @@ def documents_to_training_frame(students_data: List[Dict[str, Any]]) -> pd.DataF
     for s in students_data:
         cgpa = float(s.get("cgpa", 0) or 0)
         attendance = float(s.get("overallAttendance", 0) or 0)
-        backlogs = int(s.get("backlogs", 0) or 0)
+        current_semester = int(s.get("currentSemester", 1) or 1)
+        total_credits_earned = float(s.get("totalCreditsEarned", 0) or 0)
 
         in_sem_vals = []
         end_sem_vals = []
+        sgpa_vals = []
+        credits_vals = []
+        semester_total_marks = []
         for sem in s.get("semesterMarks", []) or []:
+            sgpa_vals.append(float(sem.get("sgpa", 0) or 0))
+            sem_totals = []
             for sub in sem.get("subjects", []) or []:
-                in_sem_vals.append(float(sub.get("internalMarks", 0) or 0))
-                end_sem_vals.append(float(sub.get("externalMarks", 0) or 0))
+                internal = float(sub.get("internalMarks", 0) or 0)
+                external = float(sub.get("externalMarks", 0) or 0)
+                in_sem_vals.append(internal)
+                end_sem_vals.append(external)
+                credits_vals.append(float(sub.get("credits", 0) or 0))
+                sem_totals.append(internal + external)
+            if sem_totals:
+                semester_total_marks.append(float(np.mean(sem_totals)))
 
-        in_total = float(np.mean(in_sem_vals) if in_sem_vals else cgpa * 4)
-        end_total = float(np.mean(end_sem_vals) if end_sem_vals else cgpa * 6)
+        # Do not backfill marks from CGPA; it creates deterministic leakage between
+        # training target and predictors.
+        in_total = float(np.mean(in_sem_vals)) if in_sem_vals else np.nan
+        end_total = float(np.mean(end_sem_vals)) if end_sem_vals else np.nan
+
+        total_marks = np.array(in_sem_vals, dtype=float) + np.array(end_sem_vals, dtype=float) if in_sem_vals and end_sem_vals else np.array([], dtype=float)
+        in_sem_pct = float(np.mean(in_sem_vals)) if in_sem_vals else np.nan
+        end_sem_pct = float(np.mean(end_sem_vals)) if end_sem_vals else np.nan
+
+        attendance_points = []
+        for rec in s.get("attendance", []) or []:
+            subjects = rec.get("subjects", []) or []
+            for sub in subjects:
+                attendance_points.append(float(sub.get("percentage", 0) or 0))
+        attendance_consistency = float(np.std(attendance_points)) if attendance_points else 0.0
+
+        sgpa_arr = np.array([v for v in sgpa_vals if v > 0], dtype=float)
+        sgpa_mean = float(np.mean(sgpa_arr)) if len(sgpa_arr) else 0.0
+        sgpa_std = float(np.std(sgpa_arr)) if len(sgpa_arr) else 0.0
+        sgpa_trend = float((sgpa_arr[-1] - sgpa_arr[0]) if len(sgpa_arr) >= 2 else 0.0)
+
+        marks_arr = np.array(semester_total_marks, dtype=float)
+        marks_consistency = float(np.std(marks_arr)) if len(marks_arr) else 0.0
+        marks_trend = float((marks_arr[-1] - marks_arr[0]) if len(marks_arr) >= 2 else 0.0)
+
+        avg_credits_per_sem = float(np.mean(credits_vals)) if credits_vals else 0.0
+        credits_progress_ratio = float(total_credits_earned / max(current_semester * 20, 1))
 
         row = {
             "PRN": s.get("prn"),
             "student_name": s.get("studentName"),
             "cgpa": cgpa,
             "overall_attendance": attendance,
-            "backlogs": backlogs,
             "in_sem_total": in_total,
             "end_sem_total": end_total,
+            "in_sem_percentage": in_sem_pct,
+            "end_sem_percentage": end_sem_pct,
+            "total_credits_earned": total_credits_earned,
+            "avg_credits_per_sem": avg_credits_per_sem,
+            "current_semester": current_semester,
+            "sgpa_mean": sgpa_mean,
+            "sgpa_std": sgpa_std,
+            "sgpa_trend": sgpa_trend,
+            "marks_consistency": marks_consistency,
+            "marks_trend": marks_trend,
+            "credits_progress_ratio": credits_progress_ratio,
+            "attendance_consistency": attendance_consistency,
         }
         rows.append(row)
 

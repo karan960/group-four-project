@@ -2748,12 +2748,18 @@ const MLModelControl = () => {
     features: 0,
     lastTrained: 'Never'
   });
+  const [trainingScope, setTrainingScope] = useState({
+    year: 'All',
+    branch: 'Information Technology',
+    division: ''
+  });
+  const [trainingHistory, setTrainingHistory] = useState([]);
 
   // ML API + Analysis states
   const [modelInfo, setModelInfo] = useState(null);
   const [analysisFilters, setAnalysisFilters] = useState({
     year: '',
-    branch: '',
+    branch: 'Information Technology',
     division: '',
     subjectName: ''
   });
@@ -2762,6 +2768,15 @@ const MLModelControl = () => {
   const [subjectStats, setSubjectStats] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
+  const [topPerformers, setTopPerformers] = useState([]);
+  const [topPerformersLoading, setTopPerformersLoading] = useState(false);
+  const [topperYearFilter, setTopperYearFilter] = useState('All');
+
+  const normalizeTrainingScope = () => ({
+    year: trainingScope.year && trainingScope.year !== 'All' ? trainingScope.year : undefined,
+    branch: trainingScope.branch || undefined,
+    division: trainingScope.division || undefined
+  });
 
   const classSummary = classStats?.statistics || {};
   const atRiskSummary = {
@@ -2869,22 +2884,75 @@ const MLModelControl = () => {
         features: Array.isArray(info.features) ? info.features.length : 0,
         lastTrained: info.lastTrained || 'Never'
       });
+      if (info.trainingScope) {
+        setTrainingScope((prev) => ({
+          ...prev,
+          year: info.trainingScope.year || prev.year,
+          branch: info.trainingScope.branch === 'All' ? '' : (info.trainingScope.branch || prev.branch),
+          division: info.trainingScope.division === 'All' ? '' : (info.trainingScope.division || prev.division)
+        }));
+      }
     } catch (e) {
       setModelStatus('Not Trained');
       setAnalysisError(`ML API unavailable or model info failed: ${e.response?.data?.error || e.message}`);
     }
   };
 
+  const refreshTrainingHistory = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_BASE_URL}/api/ml-analysis/training-history?limit=10`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTrainingHistory(Array.isArray(res.data?.runs) ? res.data.runs : []);
+    } catch (e) {
+      console.error('Failed to fetch training history:', e.message);
+      setTrainingHistory([]);
+    }
+  };
+
+  const refreshTopPerformers = async () => {
+    try {
+      setTopPerformersLoading(true);
+      setAnalysisError('');
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams({ limit: '5' });
+      if (topperYearFilter && topperYearFilter !== 'All') {
+        params.set('year', topperYearFilter);
+      }
+
+      const res = await axios.get(`${API_BASE_URL}/api/ml-analysis/top-performers?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTopPerformers(Array.isArray(res.data?.topPerformers) ? res.data.topPerformers : []);
+    } catch (e) {
+      console.error('Failed to fetch top performers:', e.message);
+      setAnalysisError(`Topper list fetch failed: ${e.response?.data?.error || e.message}`);
+      setTopPerformers([]);
+    } finally {
+      setTopPerformersLoading(false);
+    }
+  };
+
   useEffect(() => {
     refreshModelInfo();
+    refreshTrainingHistory();
+    refreshTopPerformers();
   }, []);
 
-  const trainModel = async () => {
+  useEffect(() => {
+    refreshTopPerformers();
+  }, [topperYearFilter]);
+
+  const trainModel = async (forceRetrain = false) => {
     setModelStatus('Training...');
     setTrainingProgress(0);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/train-model`, normalizeScope(), {
+      const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/train-model`, {
+        ...normalizeTrainingScope(),
+        forceRetrain
+      }, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -2902,7 +2970,8 @@ const MLModelControl = () => {
         metrics,
         featureImportance,
         lastTrained: res.data?.last_trained || new Date().toISOString(),
-        rows_used: rowsUsed
+        rows_used: rowsUsed,
+        trainingScope: res.data?.trainingScope || null
       }));
       setModelMetrics({
         accuracy: Number(((metrics.accuracy ?? 0) * 100).toFixed(2)),
@@ -2915,8 +2984,14 @@ const MLModelControl = () => {
         features: Array.isArray(features) ? features.length : 0,
         lastTrained: res.data?.last_trained || new Date().toLocaleString()
       });
+      if (res.data?.alreadyTrained) {
+        setAnalysisError(`Model already trained for selected scope (${res.data?.trainingScope?.year || 'All'} year). Showing recorded analysis.`);
+      }
+      await refreshTrainingHistory();
       window.dispatchEvent(new Event('ml-model-updated'));
-      setAnalysisError('');
+      if (!res.data?.alreadyTrained) {
+        setAnalysisError('');
+      }
     } catch (e) {
       setModelStatus('Not Trained');
       const backendError = e.response?.data?.error || e.response?.data?.details || e.response?.data?.message || e.message;
@@ -3019,9 +3094,47 @@ const MLModelControl = () => {
               </div>
             )}
 
+            <div className="form-row" style={{ marginBottom: '0.75rem' }}>
+              <div className="form-group">
+                <label>Training Year Scope</label>
+                <select
+                  className="form-control"
+                  value={trainingScope.year}
+                  onChange={(e) => setTrainingScope({ ...trainingScope, year: e.target.value })}
+                >
+                  <option value="All">All</option>
+                  <option value="First">First</option>
+                  <option value="Second">Second</option>
+                  <option value="Third">Third</option>
+                  <option value="Fourth">Fourth</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Training Branch Scope</label>
+                <input
+                  className="form-control"
+                  placeholder="Information Technology"
+                  value={trainingScope.branch}
+                  readOnly
+                />
+              </div>
+              <div className="form-group">
+                <label>Training Division Scope</label>
+                <input
+                  className="form-control"
+                  placeholder="Optional division"
+                  value={trainingScope.division}
+                  onChange={(e) => setTrainingScope({ ...trainingScope, division: e.target.value })}
+                />
+              </div>
+            </div>
+
             <div className="model-actions">
-              <button onClick={trainModel} className="btn btn-success" disabled={modelStatus === 'Training...'}>
+              <button onClick={() => trainModel(false)} className="btn btn-success" disabled={modelStatus === 'Training...'}>
                 <FaBullseye /> Train Model
+              </button>
+              <button onClick={() => trainModel(true)} className="btn btn-warning" disabled={modelStatus === 'Training...'}>
+                <FaSyncAlt /> Force Retrain
               </button>
               <button onClick={evaluateModel} className="btn btn-primary">
                 ▥ Evaluate Model
@@ -3032,6 +3145,9 @@ const MLModelControl = () => {
               <button onClick={loadModel} className="btn btn-secondary">
                 <FaUpload /> Load Model
               </button>
+            </div>
+            <div style={{ marginTop: '0.75rem', color: 'var(--muted)', fontSize: '0.9rem' }}>
+              Selected training scope: Year {trainingScope.year || 'All'}, Branch {trainingScope.branch || 'All'}, Division {trainingScope.division || 'All'}
             </div>
           </div>
         </div>
@@ -3090,6 +3206,110 @@ const MLModelControl = () => {
         </div>
       </div>
 
+      <div className="cards-grid">
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Recent Training Records</h2>
+          </div>
+          <div className="card-body">
+            {trainingHistory.length === 0 ? (
+              <div style={{ color: 'var(--muted)' }}>No training records available yet.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Trained At</th>
+                      <th>Status</th>
+                      <th>Year</th>
+                      <th>Branch</th>
+                      <th>Division</th>
+                      <th>Records</th>
+                      <th>Accuracy</th>
+                      <th>By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trainingHistory.map((run) => (
+                      <tr key={run._id}>
+                        <td>{run.trainedAt ? new Date(run.trainedAt).toLocaleString() : '-'}</td>
+                        <td>{run.status}</td>
+                        <td>{run.scope?.year || 'All'}</td>
+                        <td>{run.scope?.branch || 'All'}</td>
+                        <td>{run.scope?.division || 'All'}</td>
+                        <td>{Number(run.rowsUsed || 0)}</td>
+                        <td>{Number((run.metrics?.accuracy || 0) * 100).toFixed(2)}%</td>
+                        <td>{run.trainedBy?.username || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="cards-grid">
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title"><FaGraduationCap /> Top 5 Toppers</h2>
+          </div>
+          <div className="card-body">
+            <div className="form-group" style={{ maxWidth: '220px', marginBottom: '0.75rem' }}>
+              <label>Topper Year</label>
+              <select
+                className="form-control"
+                value={topperYearFilter}
+                onChange={(e) => setTopperYearFilter(e.target.value)}
+              >
+                <option value="All">All</option>
+                <option value="First">First</option>
+                <option value="Second">Second</option>
+                <option value="Third">Third</option>
+                <option value="Fourth">Fourth</option>
+              </select>
+            </div>
+            {topPerformersLoading ? (
+              <div style={{ color: 'var(--muted)' }}>Loading toppers...</div>
+            ) : topPerformers.length === 0 ? (
+              <div style={{ color: 'var(--muted)' }}>No topper data available for selected scope.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Name</th>
+                      <th>PRN</th>
+                      <th>Year</th>
+                      <th>Division</th>
+                      <th>CGPA</th>
+                      <th>Attendance</th>
+                      <th>Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topPerformers.map((student, index) => (
+                      <tr key={student._id || student.prn || `${student.studentName}-${index}`}>
+                        <td><strong>{index + 1}</strong></td>
+                        <td>{student.studentName || '-'}</td>
+                        <td>{student.prn || '-'}</td>
+                        <td>{student.year || '-'}</td>
+                        <td>{student.division || '-'}</td>
+                        <td>{Number(student.cgpa || 0).toFixed(2)}</td>
+                        <td>{Number(student.overallAttendance || 0).toFixed(2)}%</td>
+                        <td><strong>{Number(student.performanceScore || 0).toFixed(2)}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Admin ML Analysis Panel */}
       <div className="cards-grid">
         <div className="card">
@@ -3117,9 +3337,9 @@ const MLModelControl = () => {
                 <label>Branch</label>
                 <input
                   className="form-control"
-                  placeholder="e.g., Computer Science"
+                  placeholder="Information Technology"
                   value={analysisFilters.branch}
-                  onChange={(e) => setAnalysisFilters({ ...analysisFilters, branch: e.target.value })}
+                  readOnly
                 />
               </div>
               <div className="form-group">

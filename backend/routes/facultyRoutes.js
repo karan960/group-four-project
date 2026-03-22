@@ -239,6 +239,179 @@ router.delete('/:facultyId/subjects/:subjectCode', async (req, res) => {
   }
 });
 
+// ==================== MANUAL SUBJECTS (Faculty Self-Management) ====================
+
+// GET faculty's manually added subjects
+router.get('/:facultyId/manual-subjects', async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ facultyId: req.params.facultyId });
+    if (!faculty) {
+      return res.status(404).json({ message: 'Faculty not found' });
+    }
+
+    res.json({ 
+      manuallyAddedSubjects: faculty.manuallyAddedSubjects || [],
+      assignedSubjects: faculty.assignedSubjects || []
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// POST add subject manually by faculty
+router.post('/:facultyId/manual-subjects', async (req, res) => {
+  try {
+    const { subjectCode, subjectName, year, division, semester } = req.body;
+    
+    if (!subjectCode || !subjectName) {
+      return res.status(400).json({ message: 'Subject code and name are required' });
+    }
+
+    const faculty = await Faculty.findOne({ facultyId: req.params.facultyId });
+    if (!faculty) {
+      return res.status(404).json({ message: 'Faculty not found' });
+    }
+
+    // Check if subject already exists in manually added subjects
+    const exists = faculty.manuallyAddedSubjects?.some(
+      s => s.subjectCode === subjectCode
+    );
+
+    if (exists) {
+      return res.status(400).json({ message: 'This subject is already added to your manual subjects' });
+    }
+
+    // Initialize array if it doesn't exist
+    if (!faculty.manuallyAddedSubjects) {
+      faculty.manuallyAddedSubjects = [];
+    }
+
+    faculty.manuallyAddedSubjects.push({
+      subjectCode,
+      subjectName,
+      year: year || 'N/A',
+      division: division || 'N/A',
+      semester: semester || 0,
+      addedAt: new Date()
+    });
+
+    await faculty.save();
+
+    res.status(201).json({ 
+      message: 'Subject added successfully',
+      manuallyAddedSubjects: faculty.manuallyAddedSubjects
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// DELETE remove manually added subject
+router.delete('/:facultyId/manual-subjects/:subjectCode', async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ facultyId: req.params.facultyId });
+    if (!faculty) {
+      return res.status(404).json({ message: 'Faculty not found' });
+    }
+
+    if (!faculty.manuallyAddedSubjects) {
+      faculty.manuallyAddedSubjects = [];
+    }
+
+    faculty.manuallyAddedSubjects = faculty.manuallyAddedSubjects.filter(
+      s => s.subjectCode !== req.params.subjectCode
+    );
+
+    await faculty.save();
+
+    res.json({ 
+      message: 'Subject removed successfully',
+      manuallyAddedSubjects: faculty.manuallyAddedSubjects
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// GET available subjects for faculty selection
+router.get('/:facultyId/available-subjects', async (req, res) => {
+  try {
+    const faculty = await Faculty.findOne({ facultyId: req.params.facultyId });
+    if (!faculty) {
+      return res.status(404).json({ message: 'Faculty not found' });
+    }
+
+    const Student = require('../models/Student');
+    
+    // Find all students in the faculty's department
+    const query = { 
+      isActive: true,
+      $or: [
+        { branch: faculty.department },
+        { department: faculty.department }
+      ]
+    };
+
+    const students = await Student.find(query);
+
+    // Extract unique subjects from all students' semester marks
+    const subjectsMap = new Map();
+
+    students.forEach(student => {
+      if (student.semesterMarks && Array.isArray(student.semesterMarks)) {
+        student.semesterMarks.forEach(semesterData => {
+          if (semesterData.subjects && Array.isArray(semesterData.subjects)) {
+            semesterData.subjects.forEach(subject => {
+              if (subject.subjectCode && subject.subjectName) {
+                const key = `${subject.subjectCode}-${subject.subjectName}`;
+                if (!subjectsMap.has(key)) {
+                  subjectsMap.set(key, {
+                    subjectCode: subject.subjectCode,
+                    subjectName: subject.subjectName
+                  });
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+
+    // Also get subjects from courses created by this faculty
+    const Course = require('../models/Course');
+    const courses = await Course.find({ 
+      'createdBy.facultyId': faculty.facultyId,
+      isActive: true 
+    });
+
+    courses.forEach(course => {
+      const key = `${course.code}-${course.title}`;
+      if (!subjectsMap.has(key)) {
+        subjectsMap.set(key, {
+          subjectCode: course.code,
+          subjectName: course.title
+        });
+      }
+    });
+
+    const availableSubjects = Array.from(subjectsMap.values()).sort((a, b) => 
+      a.subjectName.localeCompare(b.subjectName)
+    );
+
+    res.json({ 
+      availableSubjects,
+      totalSubjects: availableSubjects.length
+    });
+  } catch (error) {
+    console.error('Error fetching available subjects:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message,
+      availableSubjects: []
+    });
+  }
+});
+
 // ==================== STATISTICS ====================
 
 // GET faculty statistics by department
