@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import {
   FaBell, FaEnvelope, FaEdit, FaCheck, FaTimes, FaExclamationTriangle,
@@ -7,6 +6,7 @@ import {
   FaMapMarkerAlt, FaBullhorn, FaSyncAlt
 } from 'react-icons/fa';
 import './NotificationCenter.css';
+import api from '../utils/api';
 
 const localStorage = window.sessionStorage;
 
@@ -42,10 +42,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/notifications/inbox?limit=50', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await api.get('/api/notifications/inbox?limit=50');
       setNotifications(response.data.notifications || []);
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -58,10 +55,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
   const fetchSentNotifications = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/notifications/sent?limit=50', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await api.get('/api/notifications/sent?limit=50');
       setNotifications(response.data.notifications || []);
     } catch (error) {
       console.error('Error fetching sent notifications:', error);
@@ -73,10 +67,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
 
   const fetchUnreadCount = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/notifications/unread/count', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await api.get('/api/notifications/unread/count');
       setUnreadCount(response.data.unreadCount || 0);
     } catch (error) {
       console.error('Error fetching unread count:', error);
@@ -85,12 +76,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
 
   const markAsRead = async (notificationId) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(
-        `http://localhost:5000/api/notifications/${notificationId}/read`,
-        {},
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
+      await api.put(`/api/notifications/${notificationId}/read`, {});
       
       // Update local state
       setNotifications(notifications.map(n => 
@@ -107,12 +93,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
 
   const markAllAsRead = async () => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(
-        'http://localhost:5000/api/notifications/mark-all/read',
-        {},
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
+      await api.put('/api/notifications/mark-all/read', {});
       
       fetchNotifications();
       fetchUnreadCount();
@@ -131,12 +112,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.post(
-        'http://localhost:5000/api/notifications/send',
-        formData,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
+      const response = await api.post('/api/notifications/send', formData);
 
       setStatus(`✅ Notification sent to ${response.data.recipientCount} recipients!`);
       
@@ -169,11 +145,7 @@ const NotificationCenter = ({ onClose, onNotificationRead }) => {
     if (!window.confirm('Delete this notification?')) return;
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(
-        `http://localhost:5000/api/notifications/${notificationId}`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
+      await api.delete(`/api/notifications/${notificationId}`);
 
       setNotifications(notifications.filter(n => n._id !== notificationId));
       setStatus('✅ Notification deleted');

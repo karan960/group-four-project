@@ -1,5 +1,10 @@
 .timetable-card {
   margin-top: 1rem;
+  background: linear-gradient(180deg, var(--card-bg), var(--surface-muted));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow);
+  padding: 1rem;
 }
 
 .timetable-header {
@@ -38,32 +43,41 @@
 .timetable-table td {
   vertical-align: top;
   min-width: 150px;
+  padding: 0.85rem 0.9rem;
 }
 
 .timetable-time-cell {
   font-weight: 600;
   white-space: nowrap;
+  color: var(--primary-700);
 }
 
 .timetable-entry-chip {
-  background: var(--table-header);
+  background: linear-gradient(180deg, var(--surface-elevated), var(--table-header));
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 0.45rem 0.55rem;
   margin-bottom: 0.45rem;
+  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
 }
 
 .timetable-current-cell {
-  background: rgba(33, 150, 243, 0.08);
+  background: rgba(37, 99, 235, 0.08);
 }
 
 .timetable-entry-chip.ongoing {
-  border-color: #2196f3;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.22);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
 }
 
 .timetable-entry-chip:last-child {
   margin-bottom: 0;
+}
+
+.timetable-entry-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--primary-200);
 }
 
 .entry-main {
@@ -79,4 +93,22 @@
 
 .timetable-muted {
   color: var(--muted);
+}
+
+@media (max-width: 768px) {
+  .timetable-card {
+    padding: 0.85rem;
+  }
+
+  .timetable-header {
+    flex-direction: column;
+  }
+
+  .timetable-actions {
+    width: 100%;
+  }
+
+  .timetable-actions .btn {
+    width: 100%;
+  }
 }

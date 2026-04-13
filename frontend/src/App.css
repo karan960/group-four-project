@@ -31,6 +31,14 @@ textarea {
   --font-body: 'Sora', 'Segoe UI', sans-serif;
   --font-data: 'JetBrains Mono', 'Consolas', monospace;
 
+  /* Fluid Typography Scale */
+  --text-h1: clamp(1.5rem, 5vw + 1rem, 2.25rem);
+  --text-h2: clamp(1.25rem, 4vw + 0.5rem, 1.75rem);
+  --text-body: clamp(0.875rem, 1vw + 0.5rem, 1rem); 
+
+  /* Glass Blur for backdrop filters */
+  --glass-blur: blur(16px) saturate(140%);
+
   /* Background Colors */
   --bg: #f8f9fa;
   --bg-alt: #f0f2f5;
@@ -41,18 +49,18 @@ textarea {
   --surface: #ffffff;
   
   /* Primary Colors - Modern Blue Gradient */
-  --primary: #4F46E5;
-  --primary-50: #EEF2FF;
-  --primary-100: #E0E7FF;
-  --primary-200: #C7D2FE;
-  --primary-300: #A5B4FC;
-  --primary-400: #818CF8;
-  --primary-500: #6366F1;
-  --primary-600: #4F46E5;
-  --primary-700: #4338CA;
-  --primary-800: #3730A3;
-  --primary-900: #312E81;
-  --primary-light: #818CF8;
+  --primary: #2563eb;
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-200: #bfdbfe;
+  --primary-300: #93c5fd;
+  --primary-400: #60a5fa;
+  --primary-500: #3b82f6;
+  --primary-600: #2563eb;
+  --primary-700: #1d4ed8;
+  --primary-800: #1e40af;
+  --primary-900: #172554;
+  --primary-light: #60a5fa;
   
   /* Border & Dividers */
   --border: #e2e8f0;
@@ -94,10 +102,10 @@ textarea {
   --on-primary: #ffffff;
   
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-primary: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
   --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
   --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  --gradient-info: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --gradient-info: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
   --gradient-warm: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   
   /* Transitions */
@@ -123,8 +131,21 @@ textarea {
   --dashboard-sidebar-hover: rgba(255, 255, 255, 0.10);
   --dashboard-sidebar-active: rgba(255, 255, 255, 0.18);
   --dashboard-focus-ring: 0 0 0 3px rgba(99, 102, 241, 0.2);
-  --dashboard-sidebar-gradient: linear-gradient(165deg, #0f1a38 0%, #1b2b63 40%, #2e2f77 72%, #3b2e7c 100%);
-  --dashboard-header-gradient: linear-gradient(100deg, rgba(59, 130, 246, 0.12), rgba(99, 102, 241, 0.08), rgba(6, 182, 212, 0.1));
+  --dashboard-sidebar-gradient: linear-gradient(165deg, #081225 0%, #10264b 40%, #123a74 72%, #0f4b78 100%);
+  --dashboard-header-gradient: linear-gradient(100deg, rgba(37, 99, 235, 0.12), rgba(14, 165, 233, 0.1), rgba(16, 185, 129, 0.08));
+
+  /* Global ambience and interaction */
+  --app-bg-gradient: radial-gradient(circle at 8% 10%, rgba(37, 99, 235, 0.1), transparent 36%),
+    radial-gradient(circle at 88% 16%, rgba(14, 165, 233, 0.08), transparent 34%),
+    linear-gradient(180deg, #f8fbff 0%, #edf4ff 100%);
+  --surface-elevated: #ffffff;
+  --surface-muted: #f5f8ff;
+  --surface-overlay: rgba(255, 255, 255, 0.78);
+  --ring-focus: 0 0 0 3px rgba(37, 99, 235, 0.22);
+  --input-bg: #ffffff;
+  --input-border: #d7e0ef;
+  --input-placeholder: #8a97aa;
+  --interactive-hover: #eaf2ff;
 }
 
 .dark {
@@ -138,18 +159,18 @@ textarea {
   --surface: #1e293b;
   
   /* Primary Colors - Brighter for dark mode */
-  --primary: #818CF8;
-  --primary-50: #312E81;
-  --primary-100: #3730A3;
-  --primary-200: #4338CA;
-  --primary-300: #4F46E5;
-  --primary-400: #6366F1;
-  --primary-500: #818CF8;
-  --primary-600: #A5B4FC;
-  --primary-700: #C7D2FE;
-  --primary-800: #E0E7FF;
-  --primary-900: #EEF2FF;
-  --primary-light: #A5B4FC;
+  --primary: #60a5fa;
+  --primary-50: #172554;
+  --primary-100: #1e3a8a;
+  --primary-200: #1d4ed8;
+  --primary-300: #2563eb;
+  --primary-400: #3b82f6;
+  --primary-500: #60a5fa;
+  --primary-600: #93c5fd;
+  --primary-700: #bfdbfe;
+  --primary-800: #dbeafe;
+  --primary-900: #eff6ff;
+  --primary-light: #93c5fd;
   
   /* Border & Dividers */
   --border: #334155;
@@ -191,7 +212,7 @@ textarea {
   --on-primary: #ffffff;
   
   /* Gradients - Adjusted for dark mode */
-  --gradient-primary: linear-gradient(135deg, #818CF8 0%, #6366F1 100%);
+  --gradient-primary: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
   --gradient-success: linear-gradient(135deg, #34d399 0%, #10b981 100%);
   --gradient-danger: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
   --gradient-info: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
@@ -207,8 +228,21 @@ textarea {
   --dashboard-sidebar-hover: rgba(255, 255, 255, 0.14);
   --dashboard-sidebar-active: rgba(255, 255, 255, 0.22);
   --dashboard-focus-ring: 0 0 0 3px rgba(129, 140, 248, 0.28);
-  --dashboard-sidebar-gradient: linear-gradient(165deg, #0a132d 0%, #152453 42%, #202a67 74%, #32286f 100%);
-  --dashboard-header-gradient: linear-gradient(100deg, rgba(59, 130, 246, 0.18), rgba(99, 102, 241, 0.14), rgba(6, 182, 212, 0.14));
+  --dashboard-sidebar-gradient: linear-gradient(165deg, #050c1a 0%, #0e1d3d 42%, #12386e 74%, #0b4c78 100%);
+  --dashboard-header-gradient: linear-gradient(100deg, rgba(37, 99, 235, 0.18), rgba(14, 165, 233, 0.14), rgba(16, 185, 129, 0.12));
+
+  /* Global ambience and interaction (dark mode) */
+  --app-bg-gradient: radial-gradient(circle at 14% 8%, rgba(37, 99, 235, 0.18), transparent 35%),
+    radial-gradient(circle at 82% 18%, rgba(14, 165, 233, 0.16), transparent 34%),
+    linear-gradient(180deg, #070c1a 0%, #0a1226 100%);
+  --surface-elevated: #172338;
+  --surface-muted: #101c32;
+  --surface-overlay: rgba(11, 19, 36, 0.78);
+  --ring-focus: 0 0 0 3px rgba(96, 165, 250, 0.32);
+  --input-bg: #111f34;
+  --input-border: #2c3f61;
+  --input-placeholder: #8da1bf;
+  --interactive-hover: #1a2a43;
 }
 
 * {
@@ -227,8 +261,39 @@ body {
   font-family: var(--font-body, 'Sora', 'Segoe UI', sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: var(--bg);
+  background: var(--app-bg-gradient);
   color: var(--text);
+  position: relative;
+  z-index: 0;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  pointer-events: none;
+  background: 
+    radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(56, 189, 248, 0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.08) 0px, transparent 50%);
+  filter: blur(60px);
+  animation: pulse-glow 12s ease-in-out infinite alternate;
+}
+
+.dark body::before {
+  background: 
+    radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(52, 211, 153, 0.1) 0px, transparent 50%);
+}
+
+@keyframes pulse-glow {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.1); opacity: 1; }
 }
 
 #root {
@@ -241,17 +306,29 @@ body {
   width: 100%;
   position: relative;
 }
-  .App {
-    min-height: 100vh;
-    width: 100%;
-    position: relative;
-  }
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
 
 /* ========================================
    COMMON BUTTON STYLES
    ======================================== */
 
 .btn {
+  min-height: 44px;
   padding: 12px 24px;
   border: none;
   border-radius: var(--radius-md);
@@ -267,6 +344,7 @@ body {
   position: relative;
   overflow: hidden;
   letter-spacing: 0.3px;
+  box-shadow: var(--shadow-sm);
 }
 
 svg {
@@ -396,7 +474,7 @@ svg {
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--table-header);
+  background: var(--interactive-hover);
   border-color: var(--primary);
   transform: translateY(-2px);
   box-shadow: var(--shadow);
@@ -438,10 +516,13 @@ svg {
   box-shadow: var(--shadow);
   padding: 24px;
   margin-bottom: 24px;
-  transition: all var(--transition-base);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease, border-color 0.4s ease;
   border: 1px solid var(--border);
   position: relative;
   overflow: hidden;
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .card::before {
@@ -458,12 +539,28 @@ svg {
 }
 
 .card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: var(--shadow-xl);
+  border-color: var(--primary-200);
+}
+
+.dark .card:hover {
+  border-color: var(--primary-600);
 }
 
 .card:hover::before {
   transform: scaleX(1);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .card-header {
@@ -476,7 +573,7 @@ svg {
 }
 
 .card-title {
-  font-size: 1.25rem;
+  font-size: var(--text-h2, 1.25rem);
   font-weight: 700;
   color: var(--text);
   margin: 0;
@@ -523,21 +620,11 @@ svg {
   color: var(--text);
   white-space: nowrap;
 }
-  .table th {
-    background: var(--table-header);
-    font-weight: 600;
-    color: var(--text);
-    white-space: nowrap;
-  }
 
 .table tbody tr:hover {
-  background: var(--table-header);
+  background: var(--interactive-hover);
   cursor: pointer;
 }
-  .table tbody tr:hover {
-    background: var(--table-header);
-    cursor: pointer;
-  }
 
 .table tbody tr:last-child td {
   border-bottom: none;
@@ -570,13 +657,6 @@ svg {
   color: var(--text);
   font-size: 14px;
 }
-  .form-label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: 500;
-    color: var(--text);
-    font-size: 14px;
-  }
 
 .form-label.required::after {
   content: ' *';
@@ -597,7 +677,7 @@ svg {
 }
 .form-control:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
   background: var(--card-bg);
 }
 .form-control:disabled {
@@ -767,6 +847,23 @@ textarea.form-control {
   font-weight: 500;
 }
 
+.section-header h1 {
+  color: var(--text);
+  margin: 0 0 0.5rem 0;
+  font-size: var(--text-h1, clamp(1.5rem, 4vw, 2rem));
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dashboard-header h1 {
+  color: var(--text);
+  margin: 0 0 0.5rem 0;
+  font-size: var(--text-h1, clamp(1.5rem, 4vw, 2rem));
+  font-weight: 700;
+}
+
 /* ========================================
    BADGE STYLES
    ======================================== */
@@ -931,7 +1028,7 @@ textarea.form-control {
 
 .theme-toggle:hover {
   transform: scale(1.1) rotate(15deg);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.28);
   border-color: var(--primary);
   background: var(--primary-50);
 }
@@ -1041,6 +1138,25 @@ textarea.form-control {
   background: var(--dashboard-sidebar-hover);
 }
 
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .nav-item:focus-visible,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .sidebar-toggle:focus-visible,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .profile-btn:focus-visible,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .btn:focus-visible,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .form-control:focus-visible {
+  box-shadow: var(--dashboard-focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 :is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .nav-item.active,
 :is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .sidebar-nav .nav-item.active {
   background: var(--dashboard-sidebar-active);
@@ -1111,4 +1227,1003 @@ textarea.form-control {
 .faculty-dashboard.sidebar-collapsed .sidebar-nav .nav-label,
 .admin-dashboard .sidebar.collapsed .nav-label {
   display: none;
+}
+
+/* ========================================
+   GLOBAL VISUAL REFRESH
+   ======================================== */
+
+a {
+  color: var(--primary);
+}
+
+a:hover {
+  color: var(--primary-700);
+}
+
+.card,
+.table-container,
+.table-responsive,
+.data-display-section,
+.modal,
+.profile-menu,
+.login-card,
+.demo-accounts,
+.announcement-preview,
+.audit-log-list {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.card:hover,
+.stat-card:hover,
+.activity-item:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.modal-overlay {
+  background: color-mix(in srgb, var(--bg) 36%, #000 48%);
+  backdrop-filter: blur(3px);
+}
+
+.form-control,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+select,
+textarea,
+.search-input {
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base), background-color var(--transition-base);
+}
+
+.form-control::placeholder,
+input::placeholder,
+textarea::placeholder,
+.search-input::placeholder {
+  color: var(--input-placeholder);
+}
+
+.form-control:focus,
+input:focus,
+select:focus,
+textarea:focus,
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-400);
+  box-shadow: var(--ring-focus);
+}
+
+.table th,
+.data-table th {
+  background: var(--surface-muted);
+}
+
+.table tbody tr:nth-child(even),
+.data-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--surface-elevated) 90%, var(--interactive-hover) 10%);
+}
+
+.table tbody tr:hover,
+.data-table tbody tr:hover {
+  background: var(--interactive-hover) !important;
+}
+
+.btn {
+  border-radius: 12px;
+}
+
+.btn-secondary {
+  background: var(--surface-muted);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--interactive-hover);
+}
+
+.profile-btn {
+  border-radius: 10px;
+}
+
+.theme-toggle {
+  background: var(--surface-overlay);
+  border-color: var(--input-border);
+}
+
+.theme-toggle:hover {
+  background: var(--interactive-hover);
+}
+
+@media (max-width: 768px) {
+  .modal {
+    width: min(96vw, 680px);
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+
+  .btn {
+    min-height: 40px;
+  }
+
+  .theme-toggle {
+    right: 16px;
+    bottom: 16px;
+  }
+}
+
+/* ========================================
+   ALIGNMENT + MOTION CONSISTENCY
+   ======================================== */
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .main-header {
+  min-height: 84px;
+  gap: 1rem;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .header-left,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .header-right,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .header-right,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .header-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .page-content {
+  width: 100%;
+  margin-inline: auto;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .stats-grid,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .charts-grid {
+  align-items: stretch;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .stat-card,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .chart-card,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .card {
+  height: 100%;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .stat-icon,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .action-icon,
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .summary-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .profile-actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+:is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .profile-actions .profile-btn {
+  justify-content: flex-start;
+}
+
+.modal {
+  animation: modalPop var(--transition-base) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-header,
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.modal-footer {
+  flex-wrap: wrap;
+}
+
+.table th,
+.table td,
+.data-table th,
+.data-table td {
+  vertical-align: middle;
+}
+
+.btn,
+.nav-item,
+.profile-btn,
+.stat-card,
+.chart-card,
+.card,
+.modal,
+.profile-menu,
+.theme-toggle {
+  transition-duration: var(--transition-base);
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.stat-card,
+.chart-card,
+.activity-item,
+.card {
+  animation: riseIn 420ms ease both;
+}
+
+.stat-card:nth-child(2),
+.chart-card:nth-child(2),
+.activity-item:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.stat-card:nth-child(3),
+.activity-item:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.stat-card:nth-child(4),
+.activity-item:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modalPop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 1024px) {
+  :is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .main-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  :is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .header-right,
+  :is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  :is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .stats-grid,
+  :is(.admin-dashboard, .faculty-dashboard, .student-dashboard) .charts-grid {
+    gap: 1rem;
+  }
+
+  .modal-footer {
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ========================================
+   PREMIUM ENHANCEMENTS AND ANIMATIONS
+   ======================================== */
+
+/* Refined Base Typography and Alignment */
+body {
+  letter-spacing: -0.01em;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+/* Glassmorphism overlays and richer component depth */
+.card,
+.stat-card,
+.chart-card,
+.modal-content,
+.profile-menu {
+  background: color-mix(in srgb, var(--card-bg) 85%, transparent) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border) !important;
+}
+
+.dark .card,
+.dark .stat-card,
+.dark .chart-card,
+.dark .modal-content,
+.dark .profile-menu {
+  background: color-mix(in srgb, var(--card-bg) 75%, transparent) !important;
+}
+
+/* Superior Button Interactions */
+.btn {
+  will-change: transform, box-shadow;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, background 0.2s ease !important;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.02) !important;
+  box-shadow: 0 10px 20px -10px var(--primary) !important;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.96) !important;
+  box-shadow: 0 4px 10px -5px var(--primary) !important;
+}
+
+/* Inputs and Forms Focus Ring Overhaul */
+.form-control, .search-input {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.form-control:focus, .search-input:focus {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 25%, transparent), 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+  border-color: var(--primary) !important;
+}
+
+/* Card Spring Hover Animations */
+.card, .stat-card, .chart-card, .activity-item {
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease, border-color 0.3s ease !important;
+  will-change: transform;
+}
+
+.card:hover, .stat-card:hover, .chart-card:hover, .activity-item:hover {
+  transform: translateY(-6px) scale(1.01) !important;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.12) !important;
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent) !important;
+  z-index: 10;
+}
+
+.dark .card:hover, .dark .stat-card:hover, .dark .chart-card:hover, .dark .activity-item:hover {
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Proper Entry Animations */
+.fade-in {
+  animation: premiumFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.slide-in {
+  animation: premiumSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes premiumFadeIn {
+  from { opacity: 0; filter: blur(6px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+@keyframes premiumSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(35px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* Staggered Animations for Dashboard Grids */
+.charts-grid > *, .stats-grid > * {
+  animation: premiumSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.charts-grid > *:nth-child(1) { animation-delay: 0.05s; }
+.charts-grid > *:nth-child(2) { animation-delay: 0.1s; }
+.stats-grid > *:nth-child(1) { animation-delay: 0.05s; }
+.stats-grid > *:nth-child(2) { animation-delay: 0.1s; }
+.stats-grid > *:nth-child(3) { animation-delay: 0.15s; }
+.stats-grid > *:nth-child(4) { animation-delay: 0.2s; }
+.stats-grid > *:nth-child(5) { animation-delay: 0.25s; }
+.stats-grid > *:nth-child(6) { animation-delay: 0.3s; }
+
+/* Enhanced Table Rows interaction */
+.table tbody tr, .data-table tbody tr {
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.table tbody tr:hover, .data-table tbody tr:hover {
+  transform: scale(1.01) translateX(4px);
+  box-shadow: 0 4px 15px -5px rgba(0,0,0,0.08);
+  position: relative;
+  z-index: 2;
+  border-left: 3px solid var(--primary) !important;
+}
+
+/* Dashboard Sidebar Nav Items Refinement (admin only) */
+.admin-dashboard .sidebar-nav .nav-item {
+  border-radius: 10px !important;
+  margin: 6px 12px !important;
+  width: calc(100% - 24px) !important;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.admin-dashboard .sidebar-nav .nav-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  background: var(--dashboard-sidebar-hover);
+}
+
+.admin-dashboard .sidebar-nav .nav-item.active {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 30%, transparent), transparent) !important;
+  border-left: 4px solid var(--primary-light);
+  font-weight: 700;
+  box-shadow: inset 2px 0 0 var(--primary-light);
+}
+
+/* Dashboard Main Header Polish (admin only) */
+.admin-dashboard .main-header {
+  padding: 0 2rem;
+  backdrop-filter: blur(24px);
+  background: color-mix(in srgb, var(--dashboard-surface) 75%, transparent) !important;
+  border-bottom: 1px solid var(--dashboard-border) !important;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 4px 24px -10px rgba(0,0,0,0.06) !important;
+}
+
+/* ========================================
+   ALIGNMENT AND STRUCTURE FIXES
+   ======================================== */
+
+/* Sidebar Layout Fixes (admin only) */
+.admin-dashboard .sidebar-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 1.5rem 1.25rem !important;
+}
+
+.admin-dashboard .logo-icon {
+  margin-right: 0.75rem !important;
+  flex-shrink: 0 !important;
+}
+
+.admin-dashboard .sidebar-logo {
+  justify-content: flex-start !important;
+}
+
+.admin-dashboard .nav-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 0.8rem 1.25rem !important;
+  gap: 1rem !important;
+}
+
+.admin-dashboard .sidebar-toggle.collapsed-only {
+  display: none !important;
+}
+
+/* Header Alignment Fixes (admin only) */
+.admin-dashboard .main-header, .admin-dashboard .dashboard-header {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: nowrap !important;
+  gap: 1.5rem !important;
+  height: 84px !important;
+}
+
+.admin-dashboard .header-left {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  min-width: 0 !important; /* Allow text truncation */
+  height: 100% !important;
+}
+
+.admin-dashboard .header-left h1 {
+  margin: 0 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  font-size: 1.75rem !important;
+}
+
+.admin-dashboard .header-left p {
+  margin: 0.25rem 0 0 0 !important;
+}
+
+.admin-dashboard .header-right, .admin-dashboard .header-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 1.25rem !important;
+  height: 100% !important;
+}
+
+.admin-dashboard .header-actions > *:not(.profile-dropdown) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  height: 45px !important; /* matches profile-avatar */
+}
+
+/* Profile Alignment (admin only) */
+.admin-dashboard .profile-dropdown {
+  display: flex !important;
+  align-items: center !important;
+  height: 45px !important;
+}
+
+.admin-dashboard .profile-trigger {
+  display: flex !important;
+  align-items: center !important;
+  height: 100% !important;
+}
+
+.admin-dashboard .profile-avatar {
+  margin: 0 !important;
+}
+
+/* Stats Cards Layout Fixes (admin only) */
+.admin-dashboard .stat-card, .admin-dashboard .year-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: 2rem !important;
+  position: relative !important;
+  overflow: hidden !important; 
+}
+
+.admin-dashboard .stat-icon {
+  position: absolute !important;
+  right: 1.5rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  opacity: 0.8 !important;
+  margin: 0 !important;
+}
+
+.admin-dashboard .year-card .stat-icon {
+  font-size: 5rem !important;
+  right: -0.5rem !important;
+  bottom: -1rem !important;
+  top: auto !important;
+  transform: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-secondary) !important;
+  opacity: 0.15 !important;
+  z-index: 0 !important;
+}
+
+.admin-dashboard .stat-info {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  z-index: 1 !important;
+  width: 100% !important;
+}
+
+.admin-dashboard .stat-info h3 {
+  font-size: 2.25rem !important;
+  margin-bottom: 0.25rem !important;
+  line-height: 1 !important;
+}
+
+/* Charts Grid (admin only) */
+.admin-dashboard .charts-grid {
+  align-items: stretch !important;
+}
+
+.admin-dashboard .chart-card {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+}
+
+.admin-dashboard .chart-container {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1rem 0 !important;
+  min-height: 300px !important;
+}
+
+/* Main Content Spacing (admin only) */
+.admin-dashboard .page-content {
+  padding: 2.5rem !important;
+  height: calc(100vh - 84px) !important;
+}
+
+/* Final Alignment Polish (admin only) */
+.admin-dashboard .main-header {
+  padding: 0 2.5rem !important;
+}
+
+.admin-dashboard .sidebar-nav .nav-item.active {
+  color: var(--card-bg) !important;
+}
+
+.dark .admin-dashboard .sidebar-nav .nav-item.active {
+  color: #ffffff !important;
+}
+
+/* Prevent long titles from breaking layout */
+.card h3, .chart-card h3, .dashboard-header h1 {
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  line-height: 1.4 !important;
+}
+
+/* ========================================
+   GLOBAL STRUCTURAL & RESPONSIVE NORMALIZATION
+   ======================================== */
+
+/* Remove intrusive vignette glow gradients */
+body {
+  background: var(--dashboard-content-bg) !important;
+}
+
+.dark body {
+  background: var(--dashboard-content-bg) !important;
+}
+
+/* Ensure Dashboard Wrapper enforces strict flex layout */
+.admin-dashboard {
+  display: flex !important;
+  width: 100vw !important;
+  min-height: 100vh !important;
+  overflow-x: hidden !important; 
+  position: relative !important;
+}
+
+/* Sidebar constraints (admin only) */
+.admin-dashboard .sidebar {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  height: 100vh !important;
+  width: 240px !important;
+  z-index: 1000 !important;
+  flex-shrink: 0 !important;
+}
+
+.admin-dashboard .sidebar.collapsed {
+  width: 88px !important;
+}
+
+/* Main Content proper offset and scrolling behavior (admin only) */
+.admin-dashboard .main-content {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important; /* Extremely important to prevent flex children (tables) from bleeding out */
+  margin-left: 240px !important;
+  transition: margin-left var(--transition-base) !important;
+  width: calc(100% - 240px) !important;
+}
+
+.admin-dashboard .sidebar.collapsed ~ .main-content {
+  margin-left: 88px !important;
+  width: calc(100% - 88px) !important;
+}
+
+.admin-dashboard .page-content {
+  flex: 1 1 auto !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  min-width: 0 !important;
+}
+
+/* Responsive Table Hardening (admin only) */
+.admin-dashboard .table-container, .admin-dashboard .table-responsive {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  margin-bottom: 1rem !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.admin-dashboard .table, .admin-dashboard .data-table {
+  width: 100% !important;
+  min-width: 800px !important; /* Force horizontall scroll rather than crushing columns */
+  table-layout: auto !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.admin-dashboard .table th, .admin-dashboard .table td, .admin-dashboard .data-table th, .admin-dashboard .data-table td {
+  padding: 14px 16px !important;
+  max-width: 350px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  height: auto !important;
+  border-bottom: 1px solid var(--border) !important; /* Fallback line separator */
+}
+
+/* Normalize table button spacing and wrapping (admin only) */
+.admin-dashboard .table td .btn, .admin-dashboard .data-table td .btn {
+  margin: 0 4px !important;
+  white-space: nowrap !important;
+  display: inline-flex !important;
+}
+
+/* Fix Tab Alignment on Data Display pages */
+.tabs-container, .data-display-tabs, .management-tabs {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 1rem !important;
+  margin-bottom: 2rem !important;
+  border-bottom: 2px solid var(--border) !important;
+  padding-bottom: 0px !important;
+}
+
+.tab-btn, .tab-item {
+  margin-bottom: -2px !important; /* Allows active border to overlap bottom container border */
+}
+
+/* Responsive Scaling for smaller screens (< 1000px) */
+@media screen and (max-width: 1000px) {
+  .admin-dashboard .sidebar {
+    transform: translateX(-100%) !important;
+  }
+  .admin-dashboard .sidebar.open {
+    transform: translateX(0) !important;
+  }
+  .admin-dashboard .main-content, .admin-dashboard .sidebar.collapsed ~ .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+}
+
+/* ========================================
+   PROFESSIONAL UI UPGRADES (Based on Audit)
+   ======================================== */
+
+/* 1. Sticky Integrated Top-Bar */
+:is(.admin-dashboard) .main-header,
+.dashboard-section-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 900 !important;
+  background: var(--glass-bg, rgba(255,255,255,0.7)) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+}
+
+.dark :is(.admin-dashboard) .main-header,
+.dark .dashboard-section-header {
+  background: rgba(15, 23, 42, 0.7) !important;
+}
+
+/* 2. Typography Headings Tight Tracking */
+h1, h2, h3, .card-title, .dashboard-header h1, .section-header h1 {
+  letter-spacing: -0.02em !important;
+}
+
+/* 3. Empty State Placeholders */
+.empty-state {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 0.8 !important;
+  padding: 4rem 2rem !important;
+  background: transparent !important;
+}
+
+.empty-state p::before {
+  content: '📄 ';
+  font-size: 1.5rem;
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+/* 4. Global Card Padding & Subtle Inner Glow (admin only) */
+.admin-dashboard .card {
+  padding: 2.5rem !important;
+  box-shadow: var(--shadow-md), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important;
+}
+
+.dark .admin-dashboard .card {
+  box-shadow: var(--shadow-md), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 5. Gaps Expansion (admin only) */
+.admin-dashboard .stats-grid, .admin-dashboard .charts-grid, .admin-dashboard .users-grid, .admin-dashboard .quick-actions-grid {
+  gap: 2rem !important;
+}
+
+/* Forms Action Button Hierarchy */
+.btn {
+  letter-spacing: 0.02em !important; /* Adds subtle tracking to button text for hierarchy */
+}
+@media (max-width: 768px) {
+  .btn { display: flex !important; width: 100% !important; justify-content: center !important; }
+}
+
+/* ========================================
+   FACULTY/STUDENT DASHBOARD ALIGNMENT RESET
+   Keep global polish, but restore per-dashboard card/grid layout.
+   ======================================== */
+
+:is(.faculty-dashboard, .student-dashboard) .sidebar {
+  width: 280px !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard).sidebar-collapsed .sidebar,
+:is(.faculty-dashboard, .student-dashboard) .sidebar.collapsed {
+  width: 88px !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .main-content {
+  margin-left: 280px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: 100vh !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard).sidebar-collapsed .main-content,
+:is(.faculty-dashboard, .student-dashboard) .sidebar.collapsed ~ .main-content {
+  margin-left: 88px !important;
+  width: auto !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .main-header {
+  height: auto !important;
+  min-height: 72px !important;
+  padding: 1rem 1.25rem !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .header-left h1 {
+  white-space: normal !important;
+  font-size: 1.55rem !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .header-right,
+:is(.faculty-dashboard, .student-dashboard) .header-actions {
+  height: auto !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .header-actions > *:not(.profile-dropdown) {
+  height: auto !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .page-content {
+  padding: 1rem 1.1rem 2.25rem !important;
+  margin: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  min-height: 0 !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .card {
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin-bottom: 1.25rem !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .card-header,
+:is(.faculty-dashboard, .student-dashboard) .card-body {
+  width: 100% !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .card-body {
+  overflow: visible !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .stats-grid,
+:is(.faculty-dashboard, .student-dashboard) .charts-grid,
+:is(.faculty-dashboard, .student-dashboard) .quick-actions-grid,
+:is(.faculty-dashboard, .student-dashboard) .subjects-grid,
+:is(.faculty-dashboard, .student-dashboard) .predictions-grid {
+  gap: 1.25rem !important;
+  align-items: stretch !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .stat-card,
+:is(.faculty-dashboard, .student-dashboard) .year-card {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0.9rem !important;
+  padding: 1.2rem !important;
+  overflow: hidden !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .stat-icon {
+  position: static !important;
+  transform: none !important;
+  margin: 0 !important;
+  opacity: 1 !important;
+  flex: 0 0 auto !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .year-card .stat-icon {
+  position: static !important;
+  right: auto !important;
+  bottom: auto !important;
+  top: auto !important;
+  font-size: 2rem !important;
+  opacity: 1 !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .stat-info {
+  width: auto !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .stat-info h3 {
+  font-size: 1.5rem !important;
+  margin: 0 !important;
+}
+
+:is(.faculty-dashboard, .student-dashboard) .table th,
+:is(.faculty-dashboard, .student-dashboard) .table td,
+:is(.faculty-dashboard, .student-dashboard) .data-table th,
+:is(.faculty-dashboard, .student-dashboard) .data-table td {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+@media screen and (max-width: 1000px) {
+  :is(.faculty-dashboard, .student-dashboard) .sidebar {
+    width: 84px !important;
+    transform: none !important;
+  }
+
+  :is(.faculty-dashboard, .student-dashboard) .main-content {
+    margin-left: 84px !important;
+    width: auto !important;
+  }
+
+  :is(.faculty-dashboard, .student-dashboard) .page-content {
+    padding: 0.85rem 0.85rem 1.8rem !important;
+  }
+
+  :is(.faculty-dashboard, .student-dashboard) .main-header {
+    flex-wrap: wrap !important;
+    height: auto !important;
+  }
+
+  :is(.faculty-dashboard, .student-dashboard) .stats-grid,
+  :is(.faculty-dashboard, .student-dashboard) .charts-grid {
+    grid-template-columns: 1fr !important;
+  }
 }

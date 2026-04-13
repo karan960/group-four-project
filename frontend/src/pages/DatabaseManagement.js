@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { FaChartLine, FaSyncAlt, FaFileDownload } from 'react-icons/fa';
 import './AdminDashboard.css';
+import api from '../utils/api';
 
 const localStorage = window.sessionStorage;
 
@@ -27,24 +27,16 @@ const DatabaseManagement = () => {
     setLoading(true);
     setError('');
     try {
-      const token = localStorage.getItem('token');
-      
       if (activeTab === 'students') {
-        const response = await axios.get('http://localhost:5000/api/students?limit=10000', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await api.get('/api/students?limit=10000');
         const dataArray = response.data.students || [];
         setStudents(dataArray);
       } else if (activeTab === 'faculty') {
-        const response = await axios.get('http://localhost:5000/api/faculty?limit=10000', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await api.get('/api/faculty?limit=10000');
         const dataArray = response.data.faculty || [];
         setFaculty(dataArray);
       } else if (activeTab === 'marks') {
-        const response = await axios.get('http://localhost:5000/api/students?limit=10000', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await api.get('/api/students?limit=10000');
         const dataArray = response.data.students || [];
         
         // Flatten marks data from all students
@@ -69,9 +61,7 @@ const DatabaseManagement = () => {
         });
         setMarksData(allMarks);
       } else if (activeTab === 'attendance') {
-        const response = await axios.get('http://localhost:5000/api/students?limit=10000', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await api.get('/api/students?limit=10000');
         const dataArray = response.data.students || [];
         
         // Flatten attendance data from all students

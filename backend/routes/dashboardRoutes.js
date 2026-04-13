@@ -7,6 +7,8 @@ const User = require('../models/User');
 const Course = require('../models/Course');
 const Assignment = require('../models/Assignment');
 const AttendanceSession = require('../models/AttendanceSession');
+const ERPWorkItem = require('../models/ERPWorkItem');
+const CohortAssignment = require('../models/CohortAssignment');
 
 const RAW_ML_API_URL = process.env.ML_API_URL || 'http://localhost:5001/api/ml/performance';
 const ML_ANALYSIS_API_URL = RAW_ML_API_URL.includes('/api/ml/performance')
@@ -550,6 +552,80 @@ router.get('/placement/stats', async (req, res) => {
     stats.placementPercentage = ((stats.placed / stats.total) * 100).toFixed(2);
 
     res.json({ stats });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Shared ERP bridge summary for all dashboards
+router.get('/erp/bridge', async (req, res) => {
+  try {
+    const role = String(req.user?.role || '').toLowerCase();
+    const referenceId = String(req.user?.referenceId || req.user?.username || '');
+
+    let workItemFilter;
+    if (role === 'admin') {
+      workItemFilter = { ownerRole: 'admin' };
+    } else {
+      workItemFilter = { ownerRole: role, ownerRef: referenceId };
+    }
+
+    const [openCount, inProgressCount, blockedCount] = await Promise.all([
+      ERPWorkItem.countDocuments({ ...workItemFilter, status: 'open' }),
+      ERPWorkItem.countDocuments({ ...workItemFilter, status: 'in_progress' }),
+      ERPWorkItem.countDocuments({ ...workItemFilter, status: 'blocked' })
+    ]);
+
+    let cohortContext = null;
+    if (role === 'faculty') {
+      const assignedCohorts = await CohortAssignment.find({
+        isActive: true,
+        $or: [
+          { primaryFacultyId: referenceId },
+          { supportFacultyIds: referenceId },
+          { coordinatorFacultyId: referenceId }
+        ]
+      })
+        .sort({ year: 1, division: 1 })
+        .lean();
+
+      cohortContext = {
+        totalAssignedCohorts: assignedCohorts.length,
+        cohorts: assignedCohorts
+      };
+    }
+
+    if (role === 'student') {
+      const student = await Student.findOne({ prn: referenceId, isActive: true }).select('prn year division').lean();
+      if (student) {
+        const assignment = await CohortAssignment.findOne({
+          isActive: true,
+          year: student.year,
+          division: student.division
+        }).lean();
+
+        cohortContext = {
+          student: {
+            prn: student.prn,
+            year: student.year,
+            division: student.division
+          },
+          assignment: assignment || null
+        };
+      }
+    }
+
+    res.json({
+      workItems: {
+        open: openCount,
+        inProgress: inProgressCount,
+        blocked: blockedCount,
+        active: openCount + inProgressCount + blockedCount
+      },
+      cohortContext,
+      role,
+      generatedAt: new Date().toISOString()
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

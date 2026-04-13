@@ -11,6 +11,24 @@ const Faculty = require('../models/Faculty');
 
 const jwtSecret = (process.env.JWT_SECRET || '').trim();
 
+const getDecodedAuth = (req) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+
+  if (!token) {
+    const err = new Error('No token provided');
+    err.status = 401;
+    throw err;
+  }
+
+  try {
+    return jwt.verify(token, jwtSecret);
+  } catch (error) {
+    const err = new Error('Invalid token');
+    err.status = 401;
+    throw err;
+  }
+};
+
 const profilePhotoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(__dirname, '..', 'uploads', 'profile-photos');
@@ -78,7 +96,6 @@ router.post('/register', async (req, res) => {
     const user = new User({
       username,
       password: hashedPassword,
-      plainPassword: password, // Store original password for admin display
       role,
       referenceId
     });
@@ -184,13 +201,7 @@ router.post('/login', async (req, res) => {
 // GET Profile (requires authentication)
 router.get('/profile', async (req, res) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, jwtSecret);
+    const decoded = getDecodedAuth(req);
     const user = await User.findById(decoded.userId).select('-password');
     
     if (!user || !user.isActive) {
@@ -210,8 +221,8 @@ router.get('/profile', async (req, res) => {
 
     res.json(profile);
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ message: 'Invalid token' });
+    if (error.status === 401) {
+      return res.status(401).json({ message: error.message });
     }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -219,17 +230,11 @@ router.get('/profile', async (req, res) => {
 
 router.put('/profile-photo', profilePhotoUpload.single('profilePhoto'), async (req, res) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
+    const decoded = getDecodedAuth(req);
 
     if (!req.file) {
       return res.status(400).json({ message: 'Profile photo is required' });
     }
-
-    const decoded = jwt.verify(token, jwtSecret);
     const user = await User.findById(decoded.userId);
 
     if (!user || !user.isActive) {
@@ -252,8 +257,8 @@ router.put('/profile-photo', profilePhotoUpload.single('profilePhoto'), async (r
       profilePhoto: user.profilePhoto
     });
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ message: 'Invalid token' });
+    if (error.status === 401) {
+      return res.status(401).json({ message: error.message });
     }
 
     if (error instanceof multer.MulterError) {
@@ -274,13 +279,7 @@ router.put('/profile-photo', profilePhotoUpload.single('profilePhoto'), async (r
 // POST Change Password
 router.post('/change-password', async (req, res) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, jwtSecret);
+    const decoded = getDecodedAuth(req);
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
@@ -308,8 +307,8 @@ router.post('/change-password', async (req, res) => {
 
     res.json({ message: 'Password changed successfully' });
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ message: 'Invalid token' });
+    if (error.status === 401) {
+      return res.status(401).json({ message: error.message });
     }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -318,13 +317,7 @@ router.post('/change-password', async (req, res) => {
 // POST Reset Password (Admin only)
 router.post('/reset-password', async (req, res) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, jwtSecret);
+    const decoded = getDecodedAuth(req);
     
     // Only admin can reset passwords
     if (decoded.role !== 'admin') {
@@ -348,8 +341,8 @@ router.post('/reset-password', async (req, res) => {
 
     res.json({ message: 'Password reset successfully' });
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ message: 'Invalid token' });
+    if (error.status === 401) {
+      return res.status(401).json({ message: error.message });
     }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -358,13 +351,7 @@ router.post('/reset-password', async (req, res) => {
 // GET Theme preference
 router.get('/theme', async (req, res) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, jwtSecret);
+    const decoded = getDecodedAuth(req);
     const user = await User.findById(decoded.userId).select('theme');
     
     if (!user) {
@@ -373,6 +360,9 @@ router.get('/theme', async (req, res) => {
 
     res.json({ theme: user.theme || 'light' });
   } catch (error) {
+    if (error.status === 401) {
+      return res.status(401).json({ message: error.message });
+    }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -380,13 +370,7 @@ router.get('/theme', async (req, res) => {
 // PUT Update theme preference
 router.put('/theme', async (req, res) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
-
-    const decoded = jwt.verify(token, jwtSecret);
+    const decoded = getDecodedAuth(req);
     const { theme } = req.body;
 
     if (!['light', 'dark', 'system'].includes(theme)) {
@@ -405,6 +389,9 @@ router.put('/theme', async (req, res) => {
 
     res.json({ theme: user.theme });
   } catch (error) {
+    if (error.status === 401) {
+      return res.status(401).json({ message: error.message });
+    }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

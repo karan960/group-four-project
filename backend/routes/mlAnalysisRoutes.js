@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const Faculty = require('../models/Faculty');
 const MLTrainingRun = require('../models/MLTrainingRun');
@@ -13,12 +14,23 @@ const ML_API_URL = RAW_ML_API_URL.includes('/api/ml/performance')
 const FULL_ANALYSIS_CACHE_TTL_MS = Number(process.env.FULL_ANALYSIS_CACHE_TTL_MS || 5 * 60 * 1000);
 const fullStudentAnalysisCache = new Map();
 const fullStudentAnalysisInFlight = new Map();
-const IT_DEPARTMENT = 'Information Technology';
+
+const findStudentByIdentifier = async (studentId) => {
+  const normalizedId = String(studentId || '').trim();
+  if (!normalizedId) return null;
+
+  if (mongoose.isValidObjectId(normalizedId)) {
+    const byObjectId = await Student.findById(normalizedId);
+    if (byObjectId) return byObjectId;
+  }
+
+  return Student.findOne({ prn: normalizedId, isActive: true });
+};
 
 const buildStudentQuery = ({ year, branch, division }) => {
-  const query = { isActive: true, branch: IT_DEPARTMENT };
+  const query = { isActive: true };
   if (year) query.year = year;
-  if (branch) query.branch = IT_DEPARTMENT;
+  if (branch) query.branch = branch;
   if (division) query.division = division;
   return query;
 };
@@ -56,6 +68,88 @@ const formatStudentData = (student) => {
     year: student.year,
     branch: student.branch,
     division: student.division
+  };
+};
+
+const toSafeNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const pickLatestAttendanceSnapshot = (attendance = []) => {
+  const records = Array.isArray(attendance) ? attendance : [];
+  return [...records].reverse().find((record) => {
+    if (!record) return false;
+    if (Array.isArray(record.subjects) && record.subjects.length > 0) return true;
+    if (Array.isArray(record.theorySubjects) && record.theorySubjects.length > 0) return true;
+    if (Array.isArray(record.practicalSubjects) && record.practicalSubjects.length > 0) return true;
+    return false;
+  }) || null;
+};
+
+const buildHeuristicSubjectRows = (student) => {
+  const latest = pickLatestAttendanceSnapshot(student?.attendance || []);
+  if (!latest) return [];
+
+  const directSubjects = Array.isArray(latest.subjects) ? latest.subjects : [];
+  const theorySubjects = Array.isArray(latest.theorySubjects)
+    ? latest.theorySubjects.map((sub) => ({
+        subjectName: sub.subjectName,
+        attendedClasses: toSafeNumber(sub.attendedLectures),
+        totalClasses: toSafeNumber(sub.totalLectures)
+      }))
+    : [];
+  const practicalSubjects = Array.isArray(latest.practicalSubjects)
+    ? latest.practicalSubjects.map((sub) => ({
+        subjectName: sub.subjectName,
+        attendedClasses: toSafeNumber(sub.attendedPracticals),
+        totalClasses: toSafeNumber(sub.totalPracticals)
+      }))
+    : [];
+
+  const merged = directSubjects.length > 0 ? directSubjects : [...theorySubjects, ...practicalSubjects];
+
+  return merged.map((sub) => {
+    const attended = toSafeNumber(sub.attendedClasses);
+    const total = toSafeNumber(sub.totalClasses);
+    const percentage = total > 0 ? (attended / total) * 100 : 0;
+    const rating = percentage >= 85 ? 'Excellent' : percentage >= 70 ? 'Good' : percentage >= 55 ? 'Average' : 'Needs Improvement';
+    return {
+      subject_name: sub.subjectName || sub.subject || 'Subject',
+      performance_rating: rating,
+      subject_score: Number(percentage.toFixed(2)),
+      attendance_percentage: Number(percentage.toFixed(2))
+    };
+  });
+};
+
+const buildHeuristicAnalysis = (student) => {
+  const cgpa = toSafeNumber(student?.cgpa);
+  const attendance = toSafeNumber(student?.overallAttendance);
+  const backlogs = toSafeNumber(student?.backlogs);
+  const performanceScore = Math.max(0, Math.min(100, Number((((cgpa / 10) * 70) + ((attendance / 100) * 30) - (backlogs * 3)).toFixed(2))));
+  const category = performanceScore >= 85 ? 'Excellent' : performanceScore >= 70 ? 'Good' : performanceScore >= 55 ? 'Average' : 'Needs Attention';
+  const riskLevel = performanceScore >= 75 ? 'Low Risk' : performanceScore >= 55 ? 'Medium Risk' : 'High Risk';
+  const subjectRows = buildHeuristicSubjectRows(student);
+
+  return {
+    individual: {
+      performance: {
+        overall_performance_score: performanceScore,
+        performance_category: category,
+        risk_level: riskLevel,
+        placement_probability: Number(Math.max(0, Math.min(100, performanceScore - 5)).toFixed(2)),
+        recommendations: performanceScore < 60
+          ? ['Improve attendance consistency', 'Focus on weak subjects with weekly revision plan']
+          : ['Maintain current pace and continue consistent performance']
+      }
+    },
+    subjects: {
+      subject_wise_analysis: {
+        latest: subjectRows
+      }
+    },
+    improvement: null
   };
 };
 
@@ -150,7 +244,7 @@ router.get('/student/:studentId', async (req, res) => {
     const { studentId } = req.params;
     
     // Fetch student data from database
-    const student = await Student.findById(studentId);
+    const student = await findStudentByIdentifier(studentId);
     
     if (!student) {
       return res.status(404).json({ error: 'Student not found' });
@@ -183,7 +277,7 @@ router.get('/student/:studentId/subjects', async (req, res) => {
   try {
     const { studentId } = req.params;
     
-    const student = await Student.findById(studentId);
+    const student = await findStudentByIdentifier(studentId);
     
     if (!student) {
       return res.status(404).json({ error: 'Student not found' });
@@ -216,7 +310,7 @@ router.get('/student/:studentId/improvement', async (req, res) => {
   try {
     const { studentId } = req.params;
     
-    const student = await Student.findById(studentId);
+    const student = await findStudentByIdentifier(studentId);
     
     if (!student) {
       return res.status(404).json({ error: 'Student not found' });
@@ -729,11 +823,12 @@ router.get('/student-prn/:prn', async (req, res) => {
     }
 
     const studentData = formatStudentData(student);
+    const fallback = buildHeuristicAnalysis(student);
 
-    const [individual, subjects, improvement] = await Promise.all([
+    const [individual, subjects, improvement] = await Promise.allSettled([
       axios.post(`${ML_API_URL}/individual/${student._id}`, studentData),
       axios.post(`${ML_API_URL}/subject-wise/${student._id}`, studentData),
-      axios.post(`${ML_API_URL}/improvement-analysis/${student._id}`, studentData).catch(() => ({ data: null }))
+      axios.post(`${ML_API_URL}/improvement-analysis/${student._id}`, studentData)
     ]);
 
     res.json({
@@ -743,9 +838,10 @@ router.get('/student-prn/:prn', async (req, res) => {
         prn: student.prn,
         studentName: student.studentName
       },
-      individual: individual.data,
-      subjects: subjects.data,
-      improvement: improvement?.data || null
+      individual: individual.status === 'fulfilled' ? individual.value?.data : fallback.individual,
+      subjects: subjects.status === 'fulfilled' ? subjects.value?.data : fallback.subjects,
+      improvement: improvement.status === 'fulfilled' ? (improvement.value?.data || null) : fallback.improvement,
+      degradedMode: individual.status !== 'fulfilled' || subjects.status !== 'fulfilled' || improvement.status !== 'fulfilled'
     });
   } catch (error) {
     console.error('Error fetching student PRN analysis:', error.message);
@@ -945,19 +1041,20 @@ router.get('/top-performers', async (req, res) => {
 router.get('/student/:studentId/full-analysis', async (req, res) => {
   try {
     const { studentId } = req.params;
+    const normalizedStudentId = String(studentId || '').trim();
 
-    const cached = getCachedFullStudentAnalysis(studentId);
+    const cached = getCachedFullStudentAnalysis(normalizedStudentId);
     if (cached) {
       return res.json(cached);
     }
 
-    if (fullStudentAnalysisInFlight.has(studentId)) {
-      const sharedPayload = await fullStudentAnalysisInFlight.get(studentId);
+    if (fullStudentAnalysisInFlight.has(normalizedStudentId)) {
+      const sharedPayload = await fullStudentAnalysisInFlight.get(normalizedStudentId);
       return res.json(sharedPayload);
     }
 
     const loadAnalysisPromise = (async () => {
-      const student = await Student.findById(studentId);
+      const student = await findStudentByIdentifier(normalizedStudentId);
 
       if (!student) {
         const notFoundError = new Error('Student not found');
@@ -966,10 +1063,13 @@ router.get('/student/:studentId/full-analysis', async (req, res) => {
       }
 
       const studentData = formatStudentData(student);
-      const [individual, subjects, improvement] = await Promise.all([
-        axios.post(`${ML_API_URL}/individual/${studentId}`, studentData),
-        axios.post(`${ML_API_URL}/subject-wise/${studentId}`, studentData),
-        axios.post(`${ML_API_URL}/improvement-analysis/${studentId}`, studentData).catch(() => ({ data: null }))
+      const fallback = buildHeuristicAnalysis(student);
+      const targetMlStudentId = String(student?._id || normalizedStudentId);
+
+      const [individual, subjects, improvement] = await Promise.allSettled([
+        axios.post(`${ML_API_URL}/individual/${targetMlStudentId}`, studentData),
+        axios.post(`${ML_API_URL}/subject-wise/${targetMlStudentId}`, studentData),
+        axios.post(`${ML_API_URL}/improvement-analysis/${targetMlStudentId}`, studentData)
       ]);
 
       const payload = {
@@ -985,21 +1085,22 @@ router.get('/student/:studentId/full-analysis', async (req, res) => {
           package: student.package || null,
           offerLetterDate: student.offerLetterDate || null
         },
-        individual: individual.data,
-        subjects: subjects.data,
-        improvement: improvement?.data || null
+        individual: individual.status === 'fulfilled' ? individual.value?.data : fallback.individual,
+        subjects: subjects.status === 'fulfilled' ? subjects.value?.data : fallback.subjects,
+        improvement: improvement.status === 'fulfilled' ? (improvement.value?.data || null) : fallback.improvement,
+        degradedMode: individual.status !== 'fulfilled' || subjects.status !== 'fulfilled' || improvement.status !== 'fulfilled'
       };
 
-      setCachedFullStudentAnalysis(studentId, payload);
+      setCachedFullStudentAnalysis(normalizedStudentId, payload);
       return payload;
     })();
 
-    fullStudentAnalysisInFlight.set(studentId, loadAnalysisPromise);
+    fullStudentAnalysisInFlight.set(normalizedStudentId, loadAnalysisPromise);
     try {
       const payload = await loadAnalysisPromise;
       return res.json(payload);
     } finally {
-      fullStudentAnalysisInFlight.delete(studentId);
+      fullStudentAnalysisInFlight.delete(normalizedStudentId);
     }
   } catch (error) {
     if (error?.status === 404) {

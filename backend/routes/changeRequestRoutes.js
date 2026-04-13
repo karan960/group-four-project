@@ -4,29 +4,42 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Student = require('../models/Student');
 const Faculty = require('../models/Faculty');
-
-// In-memory storage for change requests (you can create a model for this)
-let changeRequests = [];
-let requestIdCounter = 1;
+const ChangeRequest = require('../models/ChangeRequest');
+const { createWorkItem, closeWorkItemsByEntityRef } = require('../utils/erpWorkflowService');
 
 const enrichRequest = async (request) => {
+  const plainRequest = request?.toObject ? request.toObject() : { ...request };
+
   if (request.requesterRole === 'faculty' || request.facultyId) {
-    const faculty = await Faculty.findOne({ facultyId: request.facultyId || request.studentPRN });
+    const faculty = await Faculty.findOne({ facultyId: plainRequest.facultyId || plainRequest.studentPRN });
     return {
-      ...request,
+      ...plainRequest,
       studentName: faculty?.facultyName,
       year: faculty?.department,
       branch: faculty?.designation
     };
   }
 
-  const student = await Student.findOne({ prn: request.studentPRN });
+  const student = await Student.findOne({ prn: plainRequest.studentPRN });
   return {
-    ...request,
+    ...plainRequest,
     studentName: student?.studentName,
     year: student?.year,
     branch: student?.branch
   };
+};
+
+const buildPublicRequest = async (request) => {
+  const enriched = await enrichRequest(request);
+  return {
+    id: enriched.requestId,
+    ...enriched
+  };
+};
+
+const getNextRequestId = async () => {
+  const latest = await ChangeRequest.findOne().sort({ requestId: -1 }).select('requestId').lean();
+  return (latest?.requestId || 0) + 1;
 };
 
 // ==================== CHANGE REQUESTS (STUDENT + FACULTY) ====================
@@ -43,8 +56,9 @@ router.post('/profile', async (req, res) => {
         return res.status(404).json({ message: 'Faculty not found' });
       }
 
-      const changeRequest = {
-        id: requestIdCounter++,
+      const requestId = await getNextRequestId();
+      const changeRequest = await ChangeRequest.create({
+        requestId,
         requesterRole: 'faculty',
         facultyId,
         studentPRN: facultyId,
@@ -52,17 +66,26 @@ router.post('/profile', async (req, res) => {
         changeType: 'profile',
         currentData,
         requestedData,
-        status: 'pending',
-        requestedAt: new Date(),
-        approvedBy: null,
-        approvedAt: null
-      };
+      });
 
-      changeRequests.push(changeRequest);
+      await createWorkItem({
+        module: 'change-request',
+        type: 'profile-change',
+        title: `Profile change request from faculty ${facultyId}`,
+        description: 'Faculty profile update request awaiting admin approval.',
+        priority: 'medium',
+        ownerRole: 'admin',
+        sourceRole: 'faculty',
+        sourceRef: facultyId,
+        facultyId,
+        entityRef: String(changeRequest.requestId),
+        metadata: { requesterRole: 'faculty' },
+        actor: requestedBy || facultyId
+      });
 
       return res.status(201).json({
         message: 'Profile change request submitted successfully',
-        requestId: changeRequest.id
+        requestId: changeRequest.requestId
       });
     }
 
@@ -71,25 +94,35 @@ router.post('/profile', async (req, res) => {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    const changeRequest = {
-      id: requestIdCounter++,
+    const requestId = await getNextRequestId();
+    const changeRequest = await ChangeRequest.create({
+      requestId,
       requesterRole: 'student',
       studentPRN,
       requestedBy,
       changeType: 'profile',
       currentData,
       requestedData,
-      status: 'pending',
-      requestedAt: new Date(),
-      approvedBy: null,
-      approvedAt: null
-    };
+    });
 
-    changeRequests.push(changeRequest);
+    await createWorkItem({
+      module: 'change-request',
+      type: 'profile-change',
+      title: `Profile change request from student ${studentPRN}`,
+      description: 'Student profile update request awaiting admin approval.',
+      priority: 'medium',
+      ownerRole: 'admin',
+      sourceRole: 'student',
+      sourceRef: studentPRN,
+      studentPRN,
+      entityRef: String(changeRequest.requestId),
+      metadata: { requesterRole: 'student' },
+      actor: requestedBy || studentPRN
+    });
 
     res.status(201).json({
       message: 'Profile change request submitted successfully',
-      requestId: changeRequest.id
+      requestId: changeRequest.requestId
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -132,25 +165,36 @@ router.post('/password', async (req, res) => {
 
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
-    const changeRequest = {
-      id: requestIdCounter++,
+    const requestId = await getNextRequestId();
+    const changeRequest = await ChangeRequest.create({
+      requestId,
       requesterRole: role,
       studentPRN: requesterId,
       facultyId: role === 'faculty' ? requesterId : undefined,
       requestedBy,
       changeType: 'password',
       newPasswordHash: hashedNewPassword,
-      status: 'pending',
-      requestedAt: new Date(),
-      approvedBy: null,
-      approvedAt: null
-    };
+    });
 
-    changeRequests.push(changeRequest);
+    await createWorkItem({
+      module: 'change-request',
+      type: 'password-change',
+      title: `Password change request from ${role} ${requesterId}`,
+      description: 'Password change request awaiting admin approval.',
+      priority: 'high',
+      ownerRole: 'admin',
+      sourceRole: role,
+      sourceRef: requesterId,
+      studentPRN: role === 'student' ? requesterId : '',
+      facultyId: role === 'faculty' ? requesterId : '',
+      entityRef: String(changeRequest.requestId),
+      metadata: { requesterRole: role },
+      actor: requestedBy || requesterId
+    });
 
     res.status(201).json({
       message: 'Password change request submitted successfully',
-      requestId: changeRequest.id
+      requestId: changeRequest.requestId
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -162,8 +206,8 @@ router.post('/password', async (req, res) => {
 // GET all pending change requests (for admin)
 router.get('/pending', async (req, res) => {
   try {
-    const pendingRequests = changeRequests.filter((request) => request.status === 'pending');
-    const enrichedRequests = await Promise.all(pendingRequests.map(enrichRequest));
+    const pendingRequests = await ChangeRequest.find({ status: 'pending' }).sort({ requestedAt: -1 });
+    const enrichedRequests = await Promise.all(pendingRequests.map(buildPublicRequest));
 
     res.json({ requests: enrichedRequests, total: enrichedRequests.length });
   } catch (error) {
@@ -174,7 +218,8 @@ router.get('/pending', async (req, res) => {
 // GET all change requests (for admin)
 router.get('/all', async (req, res) => {
   try {
-    const enrichedRequests = await Promise.all(changeRequests.map(enrichRequest));
+    const requests = await ChangeRequest.find().sort({ requestedAt: -1 });
+    const enrichedRequests = await Promise.all(requests.map(buildPublicRequest));
     res.json({ requests: enrichedRequests, total: enrichedRequests.length });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -187,7 +232,7 @@ router.put('/:requestId/approve', async (req, res) => {
     const { requestId } = req.params;
     const { approvedBy } = req.body;
 
-    const request = changeRequests.find((item) => item.id === parseInt(requestId));
+    const request = await ChangeRequest.findOne({ requestId: Number(requestId) });
     if (!request) {
       return res.status(404).json({ message: 'Change request not found' });
     }
@@ -221,10 +266,18 @@ router.put('/:requestId/approve', async (req, res) => {
     request.status = 'approved';
     request.approvedBy = approvedBy;
     request.approvedAt = new Date();
+    await request.save();
+
+    await closeWorkItemsByEntityRef({
+      module: 'change-request',
+      entityRef: String(request.requestId),
+      actor: approvedBy || 'admin',
+      note: 'Approved by admin'
+    });
 
     res.json({
       message: 'Change request approved and applied successfully',
-      request
+      request: await buildPublicRequest(request)
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -237,7 +290,7 @@ router.put('/:requestId/reject', async (req, res) => {
     const { requestId } = req.params;
     const { rejectedBy, reason } = req.body;
 
-    const request = changeRequests.find((item) => item.id === parseInt(requestId));
+    const request = await ChangeRequest.findOne({ requestId: Number(requestId) });
     if (!request) {
       return res.status(404).json({ message: 'Change request not found' });
     }
@@ -250,10 +303,18 @@ router.put('/:requestId/reject', async (req, res) => {
     request.rejectedBy = rejectedBy;
     request.rejectedAt = new Date();
     request.rejectionReason = reason;
+    await request.save();
+
+    await closeWorkItemsByEntityRef({
+      module: 'change-request',
+      entityRef: String(request.requestId),
+      actor: rejectedBy || 'admin',
+      note: reason || 'Rejected by admin'
+    });
 
     res.json({
       message: 'Change request rejected',
-      request
+      request: await buildPublicRequest(request)
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

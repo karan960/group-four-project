@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api, { apiBaseUrl, getApiErrorMessage } from '../utils/api';
 import DataDisplay from './DataDisplay';
 import AdminTimetableManager from './AdminTimetableManager';
 import NotificationCenter from '../components/NotificationCenter';
+import LoadingState from '../components/common/LoadingState';
+import ErrorState from '../components/common/ErrorState';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -32,9 +34,9 @@ import {
 import './AdminDashboard.css';
 
 const localStorage = window.sessionStorage;
-const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
-const AUTH_API_BASE_URL = process.env.REACT_APP_AUTH_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
-const AUTH_API_FALLBACK_BASE_URL = `${window.location.protocol}//${window.location.hostname}:5000`;
+const API_BASE_URL = apiBaseUrl;
+const AUTH_API_BASE_URL = apiBaseUrl;
+const AUTH_API_FALLBACK_BASE_URL = apiBaseUrl;
 
 // Register ChartJS components
 ChartJS.register(
@@ -54,7 +56,15 @@ const ProfileDropdown = () => {
   const { user, logout, updateProfilePhoto } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('profile');
   const [profileData, setProfileData] = useState({});
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [settingsStatus, setSettingsStatus] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef(null);
   const avatarSrc = user?.profilePhoto
@@ -76,13 +86,62 @@ const ProfileDropdown = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`${API_BASE_URL}/api/users/profile`, profileData, {
+      await api.put(`${API_BASE_URL}/api/users/profile`, profileData, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       alert('Profile updated successfully!');
       setShowProfileModal(false);
     } catch (error) {
       alert('Error updating profile: ' + (error.response?.data?.message || error.message));
+    }
+  };
+
+  const handleOpenSettings = () => {
+    setSettingsTab('profile');
+    setSettingsStatus('');
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setShowSettingsModal(true);
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    setSettingsStatus('');
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setSettingsStatus('New password and confirm password do not match.');
+      return;
+    }
+
+    if ((passwordData.newPassword || '').length < 6) {
+      setSettingsStatus('New password must be at least 6 characters.');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await api.post(
+        `${AUTH_API_BASE_URL}/api/auth/change-password`,
+        {
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      setSettingsStatus('Password changed successfully.');
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (error) {
+      setSettingsStatus(error.response?.data?.message || error.message || 'Failed to change password');
     }
   };
 
@@ -102,7 +161,7 @@ const ProfileDropdown = () => {
 
       for (const baseUrl of baseCandidates) {
         try {
-          response = await axios.put(
+          response = await api.put(
             `${baseUrl}/api/auth/profile-photo`,
             formData,
             {
@@ -190,7 +249,7 @@ const ProfileDropdown = () => {
             <button 
               onClick={() => {
                 setIsOpen(false);
-                // Add settings functionality here
+                handleOpenSettings();
               }}
               className="profile-btn"
             >
@@ -265,6 +324,131 @@ const ProfileDropdown = () => {
           </div>
         </div>
       )}
+
+      {showSettingsModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '620px' }}>
+            <div className="modal-header">
+              <h3><FaCog /> Settings</h3>
+              <button onClick={() => setShowSettingsModal(false)} className="btn-close">x</button>
+            </div>
+
+            <div className="settings-tabs" style={{ display: 'flex', borderBottom: '2px solid var(--border)', marginBottom: '1rem' }}>
+              <button
+                className={`settings-tab ${settingsTab === 'profile' ? 'active' : ''}`}
+                onClick={() => setSettingsTab('profile')}
+                style={{
+                  flex: 1,
+                  padding: '0.9rem',
+                  border: 'none',
+                  background: settingsTab === 'profile' ? 'var(--primary)' : 'transparent',
+                  color: settingsTab === 'profile' ? '#fff' : 'var(--text)',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                <FaUser /> Profile
+              </button>
+              <button
+                className={`settings-tab ${settingsTab === 'password' ? 'active' : ''}`}
+                onClick={() => setSettingsTab('password')}
+                style={{
+                  flex: 1,
+                  padding: '0.9rem',
+                  border: 'none',
+                  background: settingsTab === 'password' ? 'var(--primary)' : 'transparent',
+                  color: settingsTab === 'password' ? '#fff' : 'var(--text)',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                <FaLock /> Password
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {settingsStatus && (
+                <div className={`alert ${settingsStatus.toLowerCase().includes('success') ? 'alert-success' : 'alert-info'}`}>
+                  {settingsStatus}
+                </div>
+              )}
+
+              {settingsTab === 'profile' && (
+                <form onSubmit={handleProfileUpdate} className="profile-form">
+                  <div className="form-group">
+                    <label>Username</label>
+                    <input
+                      type="text"
+                      value={profileData.username || ''}
+                      onChange={(e) => setProfileData({ ...profileData, username: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Reference ID</label>
+                    <input
+                      type="text"
+                      value={profileData.referenceId || ''}
+                      onChange={(e) => setProfileData({ ...profileData, referenceId: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" onClick={() => setShowSettingsModal(false)} className="btn btn-secondary">
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary">
+                      Save Profile
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {settingsTab === 'password' && (
+                <form onSubmit={handlePasswordChange} className="profile-form">
+                  <div className="form-group">
+                    <label>Current Password</label>
+                    <input
+                      type="password"
+                      value={passwordData.currentPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>New Password</label>
+                    <input
+                      type="password"
+                      minLength="6"
+                      value={passwordData.newPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Confirm New Password</label>
+                    <input
+                      type="password"
+                      minLength="6"
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" onClick={() => setShowSettingsModal(false)} className="btn btn-secondary">
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary">
+                      Change Password
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -287,6 +471,15 @@ const DashboardOverview = () => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [mlServiceUnavailable, setMlServiceUnavailable] = useState(false);
+  const [erpBridge, setErpBridge] = useState({ workItems: { open: 0, inProgress: 0, blocked: 0, closed: 0, active: 0 }, role: 'admin' });
+  const [erpWorkItems, setErpWorkItems] = useState([]);
+  const [cohortAssignments, setCohortAssignments] = useState([]);
+  const [facultyOptions, setFacultyOptions] = useState([]);
+  const [cohortForm, setCohortForm] = useState({ year: 'First', division: 'A', primaryFacultyId: '' });
+  const [erpLoading, setErpLoading] = useState(false);
+  const [erpError, setErpError] = useState('');
+  const [cohortSaveStatus, setCohortSaveStatus] = useState('');
   const REFRESH_INTERVAL = 10000;
 
   const toYearWiseStudents = (byYear = {}) => ({
@@ -312,6 +505,16 @@ const DashboardOverview = () => {
     };
   }, []);
 
+  useEffect(() => {
+    fetchErpBridge(true);
+
+    const intervalId = setInterval(() => {
+      fetchErpBridge(false);
+    }, 20000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
   const normalizeDistribution = (distribution = {}) => ({
     excellent: Number(distribution.excellent || 0),
     very_good: Number(distribution.very_good || 0),
@@ -325,21 +528,12 @@ const DashboardOverview = () => {
       if (showLoader) {
         setLoading(true);
       }
-      const token = localStorage.getItem('token');
 
       const [overviewResponse, dashboardResponse, modelInfoResponse, institutionStatsResponse] = await Promise.allSettled([
-        axios.get(`${API_BASE_URL}/api/dashboard/admin/overview`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        axios.get(`${API_BASE_URL}/api/dashboard/admin/dashboard`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        axios.get(`${API_BASE_URL}/api/ml-analysis/model-info`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        axios.get(`${API_BASE_URL}/api/ml-analysis/institution-stats`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
+        api.get('/api/dashboard/admin/overview'),
+        api.get('/api/dashboard/admin/dashboard'),
+        api.get('/api/ml-analysis/model-info'),
+        api.get('/api/ml-analysis/institution-stats')
       ]);
 
       const overviewStats = overviewResponse.status === 'fulfilled' ? (overviewResponse.value?.data?.stats || {}) : {};
@@ -349,6 +543,7 @@ const DashboardOverview = () => {
       const institutionStats = institutionStatsResponse.status === 'fulfilled'
         ? (institutionStatsResponse.value?.data?.statistics || {})
         : {};
+      const mlOnline = modelInfoResponse.status === 'fulfilled' && institutionStatsResponse.status === 'fulfilled';
       const rawAccuracy = typeof modelInfo.accuracy === 'number'
         ? modelInfo.accuracy
         : Number((modelInfo.metrics?.accuracy || 0) * 100);
@@ -361,6 +556,7 @@ const DashboardOverview = () => {
         yearWiseStudents: toYearWiseStudents(studentStats.byYear || {}),
         performanceDistribution: normalizeDistribution(institutionStats.performance_distribution || {})
       });
+      setMlServiceUnavailable(!mlOnline);
       setError('');
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -375,35 +571,32 @@ const DashboardOverview = () => {
 
   const fetchStatsFallback = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const [studentsRes, facultyRes, usersRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/students`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        axios.get(`${API_BASE_URL}/api/faculty`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        axios.get(`${API_BASE_URL}/api/users`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
+      const [studentsRes, facultyRes, usersRes] = await Promise.allSettled([
+        api.get('/api/students'),
+        api.get('/api/faculty'),
+        api.get('/api/users')
       ]);
 
-      const studentsData = Array.isArray(studentsRes.data)
-        ? studentsRes.data
-        : Array.isArray(studentsRes.data?.students)
-          ? studentsRes.data.students
+      const studentsPayload = studentsRes.status === 'fulfilled' ? studentsRes.value?.data : null;
+      const facultyPayload = facultyRes.status === 'fulfilled' ? facultyRes.value?.data : null;
+      const usersPayload = usersRes.status === 'fulfilled' ? usersRes.value?.data : null;
+
+      const studentsData = Array.isArray(studentsPayload)
+        ? studentsPayload
+        : Array.isArray(studentsPayload?.students)
+          ? studentsPayload.students
           : [];
 
-      const facultyData = Array.isArray(facultyRes.data)
-        ? facultyRes.data
-        : Array.isArray(facultyRes.data?.faculty)
-          ? facultyRes.data.faculty
+      const facultyData = Array.isArray(facultyPayload)
+        ? facultyPayload
+        : Array.isArray(facultyPayload?.faculty)
+          ? facultyPayload.faculty
           : [];
 
-      const usersData = Array.isArray(usersRes.data)
-        ? usersRes.data
-        : Array.isArray(usersRes.data?.users)
-          ? usersRes.data.users
+      const usersData = Array.isArray(usersPayload)
+        ? usersPayload
+        : Array.isArray(usersPayload?.users)
+          ? usersPayload.users
           : [];
 
       const yearWiseCounts = { First: 0, Second: 0, Third: 0, Fourth: 0 };
@@ -427,11 +620,106 @@ const DashboardOverview = () => {
           below_average: 0
         }
       });
+      setMlServiceUnavailable(true);
       setError('');
     } catch (error) {
-      setError('Failed to load dashboard data: ' + (error.response?.data?.message || error.message));
+      setError('Failed to load dashboard data: ' + getApiErrorMessage(error));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const normalizeFacultyList = (payload) => {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.faculty)) return payload.faculty;
+    if (Array.isArray(payload?.data)) return payload.data;
+    return [];
+  };
+
+  const fetchErpBridge = async (showLoader = false) => {
+    try {
+      if (showLoader) {
+        setErpLoading(true);
+      }
+
+      const [bridgeResponse, summaryResponse, workItemsResponse, assignmentsResponse, facultyResponse] = await Promise.allSettled([
+        api.get('/api/dashboard/erp/bridge'),
+        api.get('/api/work-items/summary'),
+        api.get('/api/work-items/my', { params: { limit: 8 } }),
+        api.get('/api/cohort-assignments'),
+        api.get('/api/faculty')
+      ]);
+
+      const bridgePayload = bridgeResponse.status === 'fulfilled' ? (bridgeResponse.value?.data || {}) : {};
+      const summaryPayload = summaryResponse.status === 'fulfilled' ? (summaryResponse.value?.data?.summary || {}) : {};
+      const workItemsPayload = workItemsResponse.status === 'fulfilled' ? (workItemsResponse.value?.data || {}) : {};
+      const assignmentsPayload = assignmentsResponse.status === 'fulfilled' ? (assignmentsResponse.value?.data || {}) : {};
+      const facultyPayload = facultyResponse.status === 'fulfilled' ? (facultyResponse.value?.data || {}) : {};
+
+      const normalizedFaculty = normalizeFacultyList(facultyPayload).filter((faculty) => faculty?.facultyId);
+
+      setErpBridge({
+        workItems: {
+          open: Number(summaryPayload.open ?? bridgePayload?.workItems?.open ?? 0),
+          inProgress: Number(summaryPayload.inProgress ?? bridgePayload?.workItems?.inProgress ?? 0),
+          blocked: Number(summaryPayload.blocked ?? bridgePayload?.workItems?.blocked ?? 0),
+          closed: Number(summaryPayload.closed ?? 0),
+          active: Number(summaryPayload.active ?? bridgePayload?.workItems?.active ?? 0)
+        },
+        role: bridgePayload?.role || 'admin'
+      });
+      setErpWorkItems(Array.isArray(workItemsPayload?.items) ? workItemsPayload.items : []);
+      setCohortAssignments(Array.isArray(assignmentsPayload?.assignments) ? assignmentsPayload.assignments : []);
+      setFacultyOptions(normalizedFaculty);
+
+      if (!cohortForm.primaryFacultyId && normalizedFaculty.length > 0) {
+        setCohortForm((prev) => ({ ...prev, primaryFacultyId: normalizedFaculty[0].facultyId }));
+      }
+
+      setErpError('');
+    } catch (fetchError) {
+      setErpError(getApiErrorMessage(fetchError));
+    } finally {
+      if (showLoader) {
+        setErpLoading(false);
+      }
+    }
+  };
+
+  const handleSaveCohortAssignment = async (event) => {
+    event.preventDefault();
+
+    if (!cohortForm.primaryFacultyId) {
+      setCohortSaveStatus('Please choose a primary faculty before saving.');
+      return;
+    }
+
+    try {
+      setCohortSaveStatus('Saving assignment...');
+      await api.put(
+        `/api/cohort-assignments/${cohortForm.year}/${cohortForm.division}`,
+        {
+          primaryFacultyId: cohortForm.primaryFacultyId,
+          supportFacultyIds: []
+        }
+      );
+
+      setCohortSaveStatus('Cohort assignment saved successfully.');
+      await fetchErpBridge(false);
+    } catch (saveError) {
+      setCohortSaveStatus(`Failed to save assignment: ${getApiErrorMessage(saveError)}`);
+    }
+  };
+
+  const handleUpdateWorkItemStatus = async (itemId, status) => {
+    try {
+      await api.put(`/api/work-items/${itemId}/status`, {
+        status,
+        note: `Updated from admin dashboard to ${status}`
+      });
+      await fetchErpBridge(false);
+    } catch (updateError) {
+      setErpError(getApiErrorMessage(updateError));
     }
   };
 
@@ -484,12 +772,7 @@ const DashboardOverview = () => {
   };
 
   if (loading) {
-    return (
-      <div className="dashboard-loading">
-        <div className="spinner"></div>
-        <p>Loading dashboard data...</p>
-      </div>
-    );
+    return <LoadingState message="Loading dashboard data..." />;
   }
 
   return (
@@ -497,7 +780,12 @@ const DashboardOverview = () => {
       <div className="dashboard-header">
         <h1>Admin Dashboard Overview</h1>
         <p>Welcome to Campus Connect Administration Panel</p>
-        {error && <div className="alert alert-error">{error}</div>}
+        <ErrorState message={error} onRetry={() => fetchDashboardStats(true)} />
+        {mlServiceUnavailable && (
+          <div className="alert alert-warning">
+            ML service is currently unavailable. Core dashboard stats are still live.
+          </div>
+        )}
       </div>
 
       {/* Statistics Cards */}
@@ -599,6 +887,180 @@ const DashboardOverview = () => {
           </div>
         </div>
       </div>
+
+      <div className="cards-grid" style={{ marginTop: '1rem' }}>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title"><FaSyncAlt /> ERP Workflow Pulse</h2>
+          </div>
+          <div className="card-body">
+            {erpError && <div className="alert alert-warning">{erpError}</div>}
+            <div className="stats-grid" style={{ marginBottom: '1rem' }}>
+              <div className="stat-card">
+                <div className="stat-icon"><FaClipboardList /></div>
+                <div className="stat-info">
+                  <h3>{erpBridge.workItems.active}</h3>
+                  <p>Active ERP Items</p>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon"><FaClock /></div>
+                <div className="stat-info">
+                  <h3>{erpBridge.workItems.open}</h3>
+                  <p>Open</p>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon"><FaTools /></div>
+                <div className="stat-info">
+                  <h3>{erpBridge.workItems.inProgress}</h3>
+                  <p>In Progress</p>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon"><FaExclamationTriangle /></div>
+                <div className="stat-info">
+                  <h3>{erpBridge.workItems.blocked}</h3>
+                  <p>Blocked</p>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon"><FaCheck /></div>
+                <div className="stat-info">
+                  <h3>{erpBridge.workItems.closed}</h3>
+                  <p>Closed</p>
+                </div>
+              </div>
+            </div>
+
+            <h3 style={{ marginBottom: '0.8rem' }}>My Work Queue</h3>
+            {erpLoading ? (
+              <LoadingState message="Loading ERP queue..." />
+            ) : erpWorkItems.length === 0 ? (
+              <p style={{ color: 'var(--muted)' }}>No ERP work items assigned right now.</p>
+            ) : (
+              <div className="table-responsive" style={{ marginBottom: '1rem' }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Module</th>
+                      <th>Priority</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {erpWorkItems.slice(0, 6).map((item) => (
+                      <tr key={item._id}>
+                        <td>{item.title}</td>
+                        <td>{item.module}</td>
+                        <td>{item.priority}</td>
+                        <td>{item.status}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            {item.status !== 'in_progress' && item.status !== 'closed' && (
+                              <button className="btn btn-secondary" onClick={() => handleUpdateWorkItemStatus(item._id, 'in_progress')}>
+                                Start
+                              </button>
+                            )}
+                            {item.status !== 'closed' && (
+                              <button className="btn btn-success" onClick={() => handleUpdateWorkItemStatus(item._id, 'closed')}>
+                                Close
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <h3 style={{ marginBottom: '0.8rem' }}>Cohort Assignment Matrix</h3>
+            <form onSubmit={handleSaveCohortAssignment} className="form-grid" style={{ marginBottom: '1rem' }}>
+              <div className="form-group">
+                <label>Year</label>
+                <select
+                  className="form-control"
+                  value={cohortForm.year}
+                  onChange={(e) => setCohortForm((prev) => ({ ...prev, year: e.target.value }))}
+                >
+                  <option value="First">First</option>
+                  <option value="Second">Second</option>
+                  <option value="Third">Third</option>
+                  <option value="Fourth">Fourth</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Division</label>
+                <select
+                  className="form-control"
+                  value={cohortForm.division}
+                  onChange={(e) => setCohortForm((prev) => ({ ...prev, division: e.target.value }))}
+                >
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                  <option value="D">D</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Primary Faculty</label>
+                <select
+                  className="form-control"
+                  value={cohortForm.primaryFacultyId}
+                  onChange={(e) => setCohortForm((prev) => ({ ...prev, primaryFacultyId: e.target.value }))}
+                >
+                  {facultyOptions.length === 0 ? (
+                    <option value="">No faculty records</option>
+                  ) : (
+                    facultyOptions.map((faculty) => (
+                      <option key={faculty._id || faculty.facultyId} value={faculty.facultyId}>
+                        {faculty.facultyName || faculty.name || faculty.facultyId} ({faculty.facultyId})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+              <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <button className="btn btn-primary" type="submit">Save Cohort Owner</button>
+              </div>
+            </form>
+            {cohortSaveStatus && <div className="alert alert-info" style={{ marginBottom: '1rem' }}>{cohortSaveStatus}</div>}
+
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Division</th>
+                    <th>Primary Faculty</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cohortAssignments.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: 'center' }}>No cohort assignments yet.</td>
+                    </tr>
+                  ) : (
+                    cohortAssignments.map((assignment) => (
+                      <tr key={`${assignment.year}-${assignment.division}`}>
+                        <td>{assignment.year}</td>
+                        <td>{assignment.division}</td>
+                        <td>{assignment.primaryFacultyId || '-'}</td>
+                        <td>{assignment.updatedAt ? new Date(assignment.updatedAt).toLocaleString() : '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -649,7 +1111,7 @@ const DataManagement = () => {
       const token = localStorage.getItem('token');
       
       if (activeTab === 'students') {
-        const response = await axios.get(`${API_BASE_URL}/api/students`, {
+        const response = await api.get(`${API_BASE_URL}/api/students`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -662,7 +1124,7 @@ const DataManagement = () => {
         
         setStudents(dataArray);
       } else {
-        const response = await axios.get(`${API_BASE_URL}/api/faculty`, {
+        const response = await api.get(`${API_BASE_URL}/api/faculty`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -705,7 +1167,7 @@ const DataManagement = () => {
       formData.append('type', uploadType);
       formData.append('mapping', JSON.stringify(columnMapping));
 
-      const response = await axios.post(`${API_BASE_URL}/api/upload-excel`, formData, {
+      const response = await api.post(`${API_BASE_URL}/api/upload-excel`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${token}`
@@ -835,7 +1297,7 @@ const DataManagement = () => {
         ? `/api/students/${editingRecord.prn}` 
         : `/api/faculty/${editingRecord.facultyId}`;
       
-      await axios.put(`${API_BASE_URL}${endpoint}`, editForm, {
+      await api.put(`${API_BASE_URL}${endpoint}`, editForm, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -856,7 +1318,7 @@ const DataManagement = () => {
           ? `/api/students/${record.prn}` 
           : `/api/faculty/${record.facultyId}`;
         
-        await axios.delete(`${API_BASE_URL}${endpoint}`, {
+        await api.delete(`${API_BASE_URL}${endpoint}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -899,7 +1361,7 @@ const DataManagement = () => {
       const token = localStorage.getItem('token');
       const endpoint = activeTab === 'students' ? '/api/students' : '/api/faculty';
       
-      await axios.post(`${API_BASE_URL}${endpoint}`, editForm, {
+      await api.post(`${API_BASE_URL}${endpoint}`, editForm, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -961,7 +1423,7 @@ const DataManagement = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(`${API_BASE_URL}/api/announcements`, {
+      const response = await api.post(`${API_BASE_URL}/api/announcements`, {
         message: announcement,
         target: announcementTarget,
         createdBy: user.username,
@@ -983,7 +1445,7 @@ const DataManagement = () => {
   const handleSystemAudit = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/api/audit-logs`, {
+      const response = await api.get(`${API_BASE_URL}/api/audit-logs`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -1012,7 +1474,7 @@ const DataManagement = () => {
       setQuickActionStatus('🔄 Backup in progress...');
       const token = localStorage.getItem('token');
       
-      const response = await axios.post(`${API_BASE_URL}/api/backup`, {}, {
+      const response = await api.post(`${API_BASE_URL}/api/backup`, {}, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -1045,7 +1507,7 @@ const DataManagement = () => {
       setQuickActionStatus('🔄 Deleting all database data...');
       const token = localStorage.getItem('token');
 
-      const response = await axios.post(
+      const response = await api.post(
         `${API_BASE_URL}/api/admin/reset-database`,
         {
           confirmationText: 'DELETE ALL DATA',
@@ -1903,7 +2365,7 @@ const PlacementManagement = () => {
       setError('');
 
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/api/students/placements`, {
+      const response = await api.get(`${API_BASE_URL}/api/students/placements`, {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           year: yearFilter || undefined,
@@ -1946,7 +2408,7 @@ const PlacementManagement = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.put(
+      await api.put(
         `${API_BASE_URL}/api/students/placements/${editingPlacement.prn}`,
         placementForm,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -1966,12 +2428,12 @@ const PlacementManagement = () => {
       const token = localStorage.getItem('token');
       let response;
       try {
-        response = await axios.get(`${API_BASE_URL}/api/placement-showcase`, {
+        response = await api.get(`${API_BASE_URL}/api/placement-showcase`, {
           headers: { Authorization: `Bearer ${token}` },
           params: { limit: 100 }
         });
       } catch (primaryError) {
-        response = await axios.get(`${API_BASE_URL}/api/placements/showcase`, {
+        response = await api.get(`${API_BASE_URL}/api/placements/showcase`, {
           headers: { Authorization: `Bearer ${token}` },
           params: { limit: 100 }
         });
@@ -2017,21 +2479,21 @@ const PlacementManagement = () => {
 
       if (editingShowcaseId) {
         try {
-          await axios.put(`${API_BASE_URL}/api/placement-showcase/${editingShowcaseId}`, payload, {
+          await api.put(`${API_BASE_URL}/api/placement-showcase/${editingShowcaseId}`, payload, {
             headers: { Authorization: `Bearer ${token}` }
           });
         } catch (primaryError) {
-          await axios.put(`${API_BASE_URL}/api/placements/showcase/${editingShowcaseId}`, payload, {
+          await api.put(`${API_BASE_URL}/api/placements/showcase/${editingShowcaseId}`, payload, {
             headers: { Authorization: `Bearer ${token}` }
           });
         }
       } else {
         try {
-          await axios.post(`${API_BASE_URL}/api/placement-showcase`, payload, {
+          await api.post(`${API_BASE_URL}/api/placement-showcase`, payload, {
             headers: { Authorization: `Bearer ${token}` }
           });
         } catch (primaryError) {
-          await axios.post(`${API_BASE_URL}/api/placements/showcase`, payload, {
+          await api.post(`${API_BASE_URL}/api/placements/showcase`, payload, {
             headers: { Authorization: `Bearer ${token}` }
           });
         }
@@ -2063,11 +2525,11 @@ const PlacementManagement = () => {
       const token = localStorage.getItem('token');
       setShowcaseError('');
       try {
-        await axios.delete(`${API_BASE_URL}/api/placement-showcase/${entryId}`, {
+        await api.delete(`${API_BASE_URL}/api/placement-showcase/${entryId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
       } catch (primaryError) {
-        await axios.delete(`${API_BASE_URL}/api/placements/showcase/${entryId}`, {
+        await api.delete(`${API_BASE_URL}/api/placements/showcase/${entryId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
       }
@@ -2499,7 +2961,7 @@ const ChangeRequestsManagement = () => {
         ? `${API_BASE_URL}/api/change-requests/pending`
         : `${API_BASE_URL}/api/change-requests/all`;
       
-      const response = await axios.get(endpoint, {
+      const response = await api.get(endpoint, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -2526,7 +2988,7 @@ const ChangeRequestsManagement = () => {
       setActionStatus('Processing...');
       const token = localStorage.getItem('token');
       
-      await axios.put(
+      await api.put(
         `${API_BASE_URL}/api/change-requests/${requestId}/approve`,
         { approvedBy: user.username },
         { headers: { 'Authorization': `Bearer ${token}` } }
@@ -2549,7 +3011,7 @@ const ChangeRequestsManagement = () => {
       setActionStatus('Processing...');
       const token = localStorage.getItem('token');
       
-      await axios.put(
+      await api.put(
         `${API_BASE_URL}/api/change-requests/${requestId}/reject`,
         { rejectedBy: user.username, reason },
         { headers: { 'Authorization': `Bearer ${token}` } }
@@ -2867,7 +3329,7 @@ const MLModelControl = () => {
     try {
       setAnalysisError('');
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${API_BASE_URL}/api/ml-analysis/model-info`, {
+      const res = await api.get(`${API_BASE_URL}/api/ml-analysis/model-info`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const info = res.data || {};
@@ -2901,7 +3363,7 @@ const MLModelControl = () => {
   const refreshTrainingHistory = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`${API_BASE_URL}/api/ml-analysis/training-history?limit=10`, {
+      const res = await api.get(`${API_BASE_URL}/api/ml-analysis/training-history?limit=10`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTrainingHistory(Array.isArray(res.data?.runs) ? res.data.runs : []);
@@ -2921,7 +3383,7 @@ const MLModelControl = () => {
         params.set('year', topperYearFilter);
       }
 
-      const res = await axios.get(`${API_BASE_URL}/api/ml-analysis/top-performers?${params.toString()}`, {
+      const res = await api.get(`${API_BASE_URL}/api/ml-analysis/top-performers?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTopPerformers(Array.isArray(res.data?.topPerformers) ? res.data.topPerformers : []);
@@ -2949,7 +3411,7 @@ const MLModelControl = () => {
     setTrainingProgress(0);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/train-model`, {
+      const res = await api.post(`${API_BASE_URL}/api/ml-analysis/train-model`, {
         ...normalizeTrainingScope(),
         forceRetrain
       }, {
@@ -3011,7 +3473,7 @@ const MLModelControl = () => {
   const loadModel = async () => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_BASE_URL}/api/ml-analysis/load-model`, {
+      await api.post(`${API_BASE_URL}/api/ml-analysis/load-model`, {
         path: 'models/performance_model.joblib'
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -3028,7 +3490,7 @@ const MLModelControl = () => {
   const exportModel = async () => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_BASE_URL}/api/ml-analysis/save-model`, {
+      await api.post(`${API_BASE_URL}/api/ml-analysis/save-model`, {
         path: 'models/performance_model.joblib'
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -3387,7 +3849,7 @@ const MLModelControl = () => {
                   setAnalysisLoading(true);
                   setAnalysisError('');
                   const token = localStorage.getItem('token');
-                  const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/class-statistics`, normalizeScope(), { headers: { Authorization: `Bearer ${token}` } });
+                  const res = await api.post(`${API_BASE_URL}/api/ml-analysis/class-statistics`, normalizeScope(), { headers: { Authorization: `Bearer ${token}` } });
                   setClassStats(res.data);
                 } catch (e) {
                   setAnalysisError(e.response?.data?.error || e.message);
@@ -3400,7 +3862,7 @@ const MLModelControl = () => {
                   setAnalysisLoading(true);
                   setAnalysisError('');
                   const token = localStorage.getItem('token');
-                  const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/at-risk-students`, normalizeScope(), { headers: { Authorization: `Bearer ${token}` } });
+                  const res = await api.post(`${API_BASE_URL}/api/ml-analysis/at-risk-students`, normalizeScope(), { headers: { Authorization: `Bearer ${token}` } });
                   setAtRisk(res.data);
                 } catch (e) {
                   setAnalysisError(e.response?.data?.error || e.message);
@@ -3413,7 +3875,7 @@ const MLModelControl = () => {
                   setAnalysisLoading(true);
                   setAnalysisError('');
                   const token = localStorage.getItem('token');
-                  const res = await axios.post(`${API_BASE_URL}/api/ml-analysis/subject-analysis`, {
+                  const res = await api.post(`${API_BASE_URL}/api/ml-analysis/subject-analysis`, {
                     subject_name: analysisFilters.subjectName || 'All Subjects',
                     ...normalizeScope()
                   }, { headers: { Authorization: `Bearer ${token}` } });
@@ -3596,7 +4058,7 @@ const UserManagement = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/api/users`, {
+      const response = await api.get(`${API_BASE_URL}/api/users`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -3614,7 +4076,7 @@ const UserManagement = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(`${API_BASE_URL}/api/auth/register`, newUser, {
+      const response = await api.post(`${API_BASE_URL}/api/auth/register`, newUser, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -3632,7 +4094,7 @@ const UserManagement = () => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
         const token = localStorage.getItem('token');
-        await axios.delete(`${API_BASE_URL}/api/users/${userId}`, {
+        await api.delete(`${API_BASE_URL}/api/users/${userId}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -3873,7 +4335,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/notifications/unread/count`, {
+        const response = await api.get(`${API_BASE_URL}/api/notifications/unread/count`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         setUnreadCount(response.data.unreadCount || 0);
@@ -4007,7 +4469,7 @@ const AdminDashboard = () => {
             // Refresh unread count after closing
             const fetchUnreadCount = async () => {
               try {
-                const response = await axios.get(`${API_BASE_URL}/api/notifications/unread/count`, {
+                const response = await api.get(`${API_BASE_URL}/api/notifications/unread/count`, {
                   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                 });
                 setUnreadCount(response.data.unreadCount || 0);
@@ -4021,7 +4483,7 @@ const AdminDashboard = () => {
             // Refresh unread count when a notification is marked as read
             const fetchUnreadCount = async () => {
               try {
-                const response = await axios.get(`${API_BASE_URL}/api/notifications/unread/count`, {
+                const response = await api.get(`${API_BASE_URL}/api/notifications/unread/count`, {
                   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                 });
                 setUnreadCount(response.data.unreadCount || 0);
@@ -4038,3 +4500,4 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+

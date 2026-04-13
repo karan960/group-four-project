@@ -1,38 +1,46 @@
 .dynamic-draft-grid {
   margin-top: 1rem;
+  background: linear-gradient(180deg, var(--card-bg), var(--surface-muted));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow);
+  padding: 1rem;
 }
 
 .draft-grid-table th,
 .draft-grid-table td {
   vertical-align: top;
   min-width: 160px;
+  padding: 0.85rem 0.9rem;
 }
 
 .time-cell {
   font-weight: 600;
   white-space: nowrap;
+  color: var(--primary-700);
 }
 
 .locked-row {
-  background: rgba(255, 193, 7, 0.08);
+  background: rgba(245, 158, 11, 0.1);
 }
 
 .locked-cell {
-  background: rgba(255, 193, 7, 0.16);
+  background: rgba(245, 158, 11, 0.16);
 }
 
 .break-chip {
   font-weight: 600;
   font-size: 0.85rem;
-  color: #8a6d00;
+  color: #92400e;
 }
 
 .empty-chip {
   font-size: 0.82rem;
   color: var(--muted);
   border: 1px dashed var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 0.6rem;
+  background: var(--surface-elevated);
 }
 
 .chip-list {
@@ -42,11 +50,12 @@
 }
 
 .subject-chip {
-  background: var(--table-header);
+  background: linear-gradient(180deg, var(--surface-elevated), var(--table-header));
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 0.45rem 0.55rem;
   cursor: grab;
+  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
 }
 
 .subject-chip:active {
@@ -61,4 +70,16 @@
 .chip-meta {
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+.subject-chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--primary-200);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 768px) {
+  .dynamic-draft-grid {
+    padding: 0.85rem;
+  }
 }

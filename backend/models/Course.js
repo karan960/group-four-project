@@ -36,7 +36,7 @@ const courseSchema = new mongoose.Schema({
             return !!faculty;
           } catch (error) {
             console.error('Faculty validation error:', error);
-            return true; // Allow on error
+            return false;
           }
         },
         message: 'Faculty with this ID does not exist'

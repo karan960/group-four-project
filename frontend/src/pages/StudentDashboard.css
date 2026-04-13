@@ -94,7 +94,7 @@
   background: var(--card-bg);
   padding: 1.5rem 2rem;
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  box-shadow: var(--dashboard-soft-shadow);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -216,12 +216,15 @@
 }
 
 /* Main Content */
-.main-content {
+.student-dashboard .main-content {
   flex: 1;
   margin-left: 280px;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  height: 100vh;
+  min-width: 0;
+  overflow: hidden;
   transition: margin-left 0.25s ease;
 }
 
@@ -253,7 +256,7 @@
   background: var(--card-bg);
   padding: 1.5rem 2rem;
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  box-shadow: var(--dashboard-soft-shadow);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -301,7 +304,6 @@
 .profile-avatar {
   width: 45px;
   height: 45px;
-  box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
   border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), var(--primary-700));
   display: flex;
@@ -402,14 +404,17 @@
 }
 
 /* Page Content */
-.page-content {
+.student-dashboard .page-content {
   flex: 1;
   padding: 2rem;
   overflow-y: auto;
+  min-height: 0;
+  overflow-x: hidden;
   /* Use full available width (to the right of the fixed sidebar) instead of centering */
   max-width: none;
   margin: 1.5rem 2rem;
   width: auto;
+  padding-bottom: 2.25rem;
 }
 
 /* small gap between header and first content block to match admin layout */
@@ -579,7 +584,7 @@
 /* Charts Grid */
 .charts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2rem;
 }
@@ -866,6 +871,45 @@
   font-size: 0.9rem;
 }
 
+.student-dashboard .erp-work-card {
+  overflow: visible;
+}
+
+.student-dashboard .erp-work-card .erp-stats-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.student-dashboard .erp-work-card .stat-card {
+  padding: 1rem;
+  border-radius: 10px;
+  gap: 0.8rem;
+  min-height: 92px;
+}
+
+.student-dashboard .erp-work-card .stat-icon {
+  width: 48px;
+  height: 48px;
+  font-size: 1.2rem;
+}
+
+.student-dashboard .erp-work-card .stat-icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.student-dashboard .erp-work-card .stat-info h3 {
+  font-size: 1.3rem;
+  color: var(--text-primary);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.student-dashboard .erp-work-card .table-responsive {
+  margin-top: 0.5rem;
+}
+
 /* Role Badges */
 .role-badge {
   padding: 0.4rem 0.8rem;
@@ -962,35 +1006,6 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .student-dashboard .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-  }
-  
-  .student-dashboard .sidebar.open {
-    transform: translateX(0);
-  }
-  
-  .student-dashboard .main-content {
-    margin-left: 0;
-  }
-  
-  .main-header {
-    padding: 1rem;
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
-  
-  .header-left,
-  .header-right {
-    text-align: center;
-  }
-  
-  .header-actions {
-    justify-content: center;
-  }
-  
   .page-content {
     padding: 1rem;
   }
@@ -1013,6 +1028,14 @@
   
   .quick-actions-grid {
     grid-template-columns: 1fr;
+  }
+
+  .student-dashboard .erp-work-card .erp-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .student-dashboard .erp-work-card .stat-card {
+    min-height: 80px;
   }
 }
 
@@ -1087,5 +1110,175 @@
 
   .student-dashboard .data-table {
     font-size: 0.84rem;
+  }
+}
+
+/* Dashboard alignment baseline */
+.student-dashboard .page-content > * {
+  width: 100%;
+}
+
+.student-dashboard .card,
+.student-dashboard .card-body {
+  overflow: visible;
+}
+
+.student-dashboard .stats-grid,
+.student-dashboard .charts-grid,
+.student-dashboard .quick-actions-grid,
+.student-dashboard .predictions-grid,
+.student-dashboard .profile-grid {
+  align-items: stretch;
+}
+
+/* Final locked fix for student dashboard layout */
+.student-dashboard {
+  overflow-x: hidden !important;
+}
+
+.student-dashboard .main-content {
+  margin-left: 280px !important;
+  width: calc(100vw - 280px) !important;
+  max-width: calc(100vw - 280px) !important;
+  min-width: 0 !important;
+  min-height: 100vh !important;
+  height: 100vh !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.student-dashboard.sidebar-collapsed .main-content {
+  margin-left: 88px !important;
+  width: calc(100vw - 88px) !important;
+  max-width: calc(100vw - 88px) !important;
+}
+
+.student-dashboard .page-content {
+  margin: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  padding: 1rem 1.1rem 6rem !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+
+.student-dashboard .stats-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)) !important;
+  gap: 1rem !important;
+}
+
+.student-dashboard .charts-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+  gap: 1rem !important;
+}
+
+.student-dashboard .quick-actions-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
+  gap: 1rem !important;
+}
+
+.student-dashboard .student-dashboard-cards-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 1rem !important;
+  align-items: stretch !important;
+  margin-bottom: 1rem !important;
+}
+
+.student-dashboard .student-dashboard-cards-grid > .card,
+.student-dashboard .student-dashboard-cards-grid > .quick-actions-section {
+  margin-bottom: 0 !important;
+  height: 100% !important;
+}
+
+.student-dashboard .student-dashboard-cards-grid > .analysis-wide-card,
+.student-dashboard .student-dashboard-cards-grid > .ai-wide-card,
+.student-dashboard .student-dashboard-cards-grid > .workflow-wide-card,
+.student-dashboard .student-dashboard-cards-grid > .attendance-details-card,
+.student-dashboard .student-dashboard-cards-grid > .quick-actions-card {
+  grid-column: 1 / -1 !important;
+}
+
+.student-dashboard .student-dashboard-cards-grid > .erp-work-card,
+.student-dashboard .student-dashboard-cards-grid > .card:not(.analysis-wide-card):not(.attendance-details-card) {
+  display: flex;
+  flex-direction: column;
+}
+
+.student-dashboard .student-dashboard-cards-grid > .erp-work-card .card-body {
+  flex: 1 1 auto;
+}
+
+.student-dashboard .erp-work-card .erp-stats-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.student-dashboard .card {
+  margin-bottom: 1.25rem !important;
+}
+
+.student-dashboard .analysis-recommendations-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+
+.student-dashboard .analysis-recommendations-card h4 {
+  margin-top: 0;
+  margin-bottom: 0.65rem;
+}
+
+.student-dashboard .analysis-overview-grid {
+  align-items: stretch;
+}
+
+.student-dashboard .analysis-overview-grid .chart-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.student-dashboard .analysis-overview-grid .chart-container {
+  flex: 1 1 auto;
+  min-height: 300px;
+}
+
+.student-dashboard .table th.numeric-col,
+.student-dashboard .table td.numeric-col {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.student-dashboard .table td.numeric-col .percentage-bar {
+  margin-left: auto;
+}
+
+@media (max-width: 1000px) {
+  .student-dashboard .sidebar {
+    width: 84px !important;
+  }
+
+  .student-dashboard .main-content {
+    margin-left: 84px !important;
+    width: calc(100vw - 84px) !important;
+    max-width: calc(100vw - 84px) !important;
+  }
+
+  .student-dashboard .stats-grid,
+  .student-dashboard .charts-grid,
+  .student-dashboard .quick-actions-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .student-dashboard .student-dashboard-cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .student-dashboard .erp-work-card .erp-stats-grid {
+    grid-template-columns: 1fr !important;
   }
 }

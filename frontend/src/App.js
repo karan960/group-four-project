@@ -14,7 +14,11 @@ import './App.css';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
   
   if (!user) {
     return <Navigate to="/login" />;

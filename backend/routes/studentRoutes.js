@@ -3,6 +3,7 @@ const router = express.Router();
 const Student = require('../models/Student');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
+const { ensureAttendanceInterventionItem } = require('../utils/erpWorkflowService');
 
 const ensureAdmin = (req, res) => {
   if (String(req.user?.role || '').toLowerCase() !== 'admin') {
@@ -458,6 +459,13 @@ router.post('/:prn/attendance', async (req, res) => {
     student.overallAttendance = (totalAttendancePercentage / student.attendance.length).toFixed(2);
 
     await student.save();
+
+    await ensureAttendanceInterventionItem({
+      student,
+      month,
+      year,
+      actor: req.user?.username || req.user?.referenceId || 'system'
+    });
 
     res.json({ 
       message: 'Attendance updated successfully',

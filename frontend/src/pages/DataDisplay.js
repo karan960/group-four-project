@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -7,6 +6,7 @@ import {
   FaCheckCircle, FaSearch, FaFileDownload, FaSyncAlt
 } from 'react-icons/fa';
 import './AdminDashboard.css';
+import api from '../utils/api';
 
 const localStorage = window.sessionStorage;
 
@@ -43,24 +43,16 @@ const DataDisplay = () => {
     setError('');
     setPageNumber(1);
     try {
-      const token = localStorage.getItem('token');
-      
       if (activeTab === 'students') {
-        const response = await axios.get('http://localhost:5000/api/students?limit=10000', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await api.get('/api/students?limit=10000');
         const dataArray = response.data.students || [];
         setStudents(dataArray);
       } else if (activeTab === 'faculty') {
-        const response = await axios.get('http://localhost:5000/api/faculty?limit=10000', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await api.get('/api/faculty?limit=10000');
         const dataArray = response.data.faculty || [];
         setFaculty(dataArray);
       } else if (activeTab === 'marks') {
-        const response = await axios.get('http://localhost:5000/api/students?limit=10000', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await api.get('/api/students?limit=10000');
         const dataArray = response.data.students || [];
         
         const allMarks = [];
@@ -84,9 +76,7 @@ const DataDisplay = () => {
         });
         setMarksData(allMarks);
       } else if (activeTab === 'attendance') {
-        const response = await axios.get('http://localhost:5000/api/students?limit=10000', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await api.get('/api/students?limit=10000');
         const dataArray = response.data.students || [];
         
         const allAttendance = [];
@@ -210,15 +200,12 @@ const DataDisplay = () => {
     }
     
     try {
-      const token = localStorage.getItem('token');
       const id = activeTab === 'students' ? record.prn : record.facultyId;
       const endpoint = activeTab === 'students' 
         ? `/api/students/${id}` 
         : `/api/faculty/${id}`;
       
-      await axios.delete(`http://localhost:5000${endpoint}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      await api.delete(endpoint);
       
       setCrudMessage('[OK] Record deleted successfully!');
       setTimeout(() => setCrudMessage(''), 3000);
@@ -256,15 +243,12 @@ const DataDisplay = () => {
 
   const handleUpdate = async () => {
     try {
-      const token = localStorage.getItem('token');
       const id = activeTab === 'students' ? editForm.prn : editForm.facultyId;
       const endpoint = activeTab === 'students' 
         ? `/api/students/${id}` 
         : `/api/faculty/${id}`;
       
-      await axios.put(`http://localhost:5000${endpoint}`, editForm, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      await api.put(endpoint, editForm);
       
       setCrudMessage('[OK] Record updated successfully!');
       setTimeout(() => setCrudMessage(''), 3000);
@@ -277,12 +261,9 @@ const DataDisplay = () => {
 
   const handleCreate = async () => {
     try {
-      const token = localStorage.getItem('token');
       const endpoint = activeTab === 'students' ? '/api/students' : '/api/faculty';
       
-      await axios.post(`http://localhost:5000${endpoint}`, editForm, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      await api.post(endpoint, editForm);
       
       setCrudMessage('[OK] Record created successfully!');
       setTimeout(() => setCrudMessage(''), 3000);

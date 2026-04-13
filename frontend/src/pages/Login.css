@@ -3,8 +3,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  background:
+    radial-gradient(circle at 12% 14%, rgba(37, 99, 235, 0.2), transparent 34%),
+    radial-gradient(circle at 85% 18%, rgba(14, 165, 233, 0.18), transparent 32%),
+    linear-gradient(135deg, #edf4ff 0%, #eef6ff 52%, #f8fbff 100%);
+  padding: 24px;
   position: relative;
   overflow: hidden;
 }
@@ -16,7 +19,7 @@
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 70%);
   animation: rotate 30s linear infinite;
 }
 
@@ -30,17 +33,17 @@
 }
 
 .login-card {
-  background: var(--card-bg);
-  padding: 3.5rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.68));
+  padding: 3rem;
   border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-xl);
   width: 100%;
-  max-width: 440px;
+  max-width: 460px;
   position: relative;
   z-index: 1;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  animation: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid color-mix(in srgb, var(--border) 65%, white);
+  animation: slideUp 0.55s cubic-bezier(0.2, 0, 0, 1);
 }
 
 @keyframes slideUp {
@@ -56,7 +59,7 @@
 
 .login-header {
   text-align: center;
-  margin-bottom: 2.5rem;
+  margin-bottom: 2rem;
 }
 
 .login-header h1 {
@@ -67,7 +70,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  background: var(--gradient-primary);
+  background: linear-gradient(135deg, var(--primary-700), var(--info));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -84,6 +87,9 @@
   color: var(--muted);
   margin: 0;
   font-size: 1rem;
+  max-width: 28ch;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .login-form {
@@ -98,15 +104,17 @@
   font-weight: 700;
   letter-spacing: 0.5px;
   margin-top: 1rem;
+  border-radius: var(--radius-lg);
 }
 
 .demo-accounts {
-  background: var(--table-header);
-  padding: 1.75rem;
-  border-radius: var(--radius-lg);
-  border-left: 4px solid var(--primary);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(243, 248, 255, 0.84));
+  padding: 1.5rem 1.6rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .demo-accounts::before {
@@ -114,13 +122,14 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 4px;
+  width: 100%;
   height: 100%;
-  background: var(--gradient-primary);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(14, 165, 233, 0.08));
+  pointer-events: none;
 }
 
 .demo-accounts h3 {
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
   color: var(--text);
   font-size: 1.1rem;
   font-weight: 700;
@@ -131,4 +140,44 @@
   font-size: 0.9rem;
   color: var(--text-secondary);
   font-weight: 500;
+}
+
+.login-card .form-control {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: color-mix(in srgb, var(--border) 78%, white);
+}
+
+.login-card .form-control:focus {
+  background: #ffffff;
+}
+
+.login-card .btn {
+  box-shadow: var(--shadow-sm);
+}
+
+.dark .login-container {
+  background:
+    radial-gradient(circle at 14% 12%, rgba(37, 99, 235, 0.22), transparent 34%),
+    radial-gradient(circle at 82% 16%, rgba(56, 189, 248, 0.16), transparent 32%),
+    linear-gradient(135deg, #0a1328 0%, #0f1e3b 52%, #0b162f 100%);
+}
+
+.dark .login-card {
+  background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+  border-color: var(--border);
+}
+
+@media (max-width: 640px) {
+  .login-container {
+    padding: 16px;
+  }
+
+  .login-card {
+    padding: 1.5rem;
+    border-radius: var(--radius-xl);
+  }
+
+  .login-header h1 {
+    font-size: 1.7rem;
+  }
 }

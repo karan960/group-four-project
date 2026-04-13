@@ -120,6 +120,8 @@ const timetableRoutes = require('./routes/timetableRoutes');
 const timetablePublicRoutes = require('./routes/timetablePublicRoutes');
 const attendanceSessionRoutes = require('./routes/attendanceSessionRoutes');
 const placementShowcaseRoutes = require('./routes/placementShowcaseRoutes');
+const cohortAssignmentRoutes = require('./routes/cohortAssignmentRoutes');
+const erpWorkItemRoutes = require('./routes/erpWorkItemRoutes');
 
 // ==================== MIDDLEWARE ====================
 const authMiddleware = async (req, res, next) => {
@@ -217,6 +219,8 @@ app.use('/api/courses', authMiddleware, courseRoutes);
 app.use('/api/assignments', authMiddleware, assignmentRoutes);
 app.use('/api/attendance-sessions', authMiddleware, attendanceSessionRoutes);
 app.use('/api/placement-showcase', authMiddleware, placementShowcaseRoutes);
+app.use('/api/cohort-assignments', authMiddleware, cohortAssignmentRoutes);
+app.use('/api/work-items', authMiddleware, erpWorkItemRoutes);
 // Backward-compatible aliases for past placement showcase routes.
 app.use('/api/placements/showcase', authMiddleware, placementShowcaseRoutes);
 app.use('/api/showcase/placements', authMiddleware, placementShowcaseRoutes);
@@ -477,7 +481,6 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
             const existingUser = await User.findOne({ username: studentData.prn });
             if (existingUser) {
               existingUser.password = defaultPassword;
-              existingUser.plainPassword = studentData.prn;
               existingUser.role = 'student';
               existingUser.referenceId = studentData.prn;
               existingUser.isActive = true;
@@ -486,7 +489,6 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
               await User.create({
                 username: studentData.prn,
                 password: defaultPassword,
-                plainPassword: studentData.prn,
                 role: 'student',
                 referenceId: studentData.prn,
                 isActive: true
@@ -501,7 +503,6 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
             const existingUser = await User.findOne({ username: studentData.prn });
             if (existingUser) {
               existingUser.password = defaultPassword;
-              existingUser.plainPassword = studentData.prn;
               existingUser.role = 'student';
               existingUser.referenceId = studentData.prn;
               existingUser.isActive = true;
@@ -510,7 +511,6 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
               await User.create({
                 username: studentData.prn,
                 password: defaultPassword,
-                plainPassword: studentData.prn, // Store original password for admin display
                 role: 'student',
                 referenceId: studentData.prn,
                 isActive: true
@@ -557,7 +557,6 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
             await User.create({
               username: facultyData.facultyId,
               password: defaultPassword,
-              plainPassword: facultyData.facultyId, // Store original password for admin display
               role: 'faculty',
               referenceId: facultyData.facultyId
             });

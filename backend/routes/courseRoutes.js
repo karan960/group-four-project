@@ -111,4 +111,37 @@ router.post('/', upload.single('file'), async (req, res) => {
   }
 });
 
+// ==================== DELETE COURSE ====================
+router.delete('/:courseId', async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const userRole = (req.user.role || '').toLowerCase();
+    const { courseId } = req.params;
+
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+
+    const isOwner = String(course.createdBy?.userId || '') === String(userId);
+    if (userRole !== 'admin' && !isOwner) {
+      return res.status(403).json({ message: 'Not authorized to delete this course' });
+    }
+
+    if (course.attachmentUrl) {
+      const attachmentPath = path.join(__dirname, '..', course.attachmentUrl.replace(/^\//, ''));
+      if (fs.existsSync(attachmentPath)) {
+        fs.unlinkSync(attachmentPath);
+      }
+    }
+
+    await Course.findByIdAndDelete(courseId);
+
+    res.json({ message: 'Course deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting course:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 module.exports = router;

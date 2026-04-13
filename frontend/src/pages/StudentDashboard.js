@@ -206,6 +206,11 @@ const StudentDashboard = () => {
   const [sendingPresenceRequest, setSendingPresenceRequest] = useState(false);
   const [pastPlacements, setPastPlacements] = useState([]);
   const [pastPlacementsLoading, setPastPlacementsLoading] = useState(false);
+  const [erpBridge, setErpBridge] = useState(null);
+  const [erpSummary, setErpSummary] = useState({ active: 0, open: 0, inProgress: 0, blocked: 0, closed: 0 });
+  const [erpWorkItems, setErpWorkItems] = useState([]);
+  const [erpLoading, setErpLoading] = useState(false);
+  const [erpError, setErpError] = useState('');
   
   // Settings Modal States
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -253,6 +258,14 @@ const StudentDashboard = () => {
     if (activeTab === 'Placements') {
       fetchPastPlacements();
     }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'Dashboard') return undefined;
+
+    fetchErpContext(true);
+    const interval = setInterval(() => fetchErpContext(false), 20000);
+    return () => clearInterval(interval);
   }, [activeTab]);
 
   useEffect(() => {
@@ -478,19 +491,50 @@ const StudentDashboard = () => {
           recommendations: performanceDetails?.recommendations || []
         });
 
-        // Use actual attendance data if available
-        const attendanceBySubject = student.attendance?.length > 0
-          ? student.attendance[0].subjects || []
+        // Use the most recent attendance snapshot so final-year students see current subjects.
+        const attendanceRecords = Array.isArray(student.attendance) ? student.attendance : [];
+        const latestAttendanceRecord = [...attendanceRecords].reverse().find((record) => {
+          if (!record) return false;
+          if (Array.isArray(record.subjects) && record.subjects.length > 0) return true;
+          if (Array.isArray(record.theorySubjects) && record.theorySubjects.length > 0) return true;
+          if (Array.isArray(record.practicalSubjects) && record.practicalSubjects.length > 0) return true;
+          return false;
+        }) || null;
+
+        const directSubjects = Array.isArray(latestAttendanceRecord?.subjects)
+          ? latestAttendanceRecord.subjects
           : [];
+
+        const fallbackTheorySubjects = Array.isArray(latestAttendanceRecord?.theorySubjects)
+          ? latestAttendanceRecord.theorySubjects.map((sub) => ({
+              subjectName: sub.subjectName,
+              attendedClasses: Number(sub.attendedLectures || 0),
+              totalClasses: Number(sub.totalLectures || 0)
+            }))
+          : [];
+
+        const fallbackPracticalSubjects = Array.isArray(latestAttendanceRecord?.practicalSubjects)
+          ? latestAttendanceRecord.practicalSubjects.map((sub) => ({
+              subjectName: sub.subjectName,
+              attendedClasses: Number(sub.attendedPracticals || 0),
+              totalClasses: Number(sub.totalPracticals || 0)
+            }))
+          : [];
+
+        const attendanceBySubject = directSubjects.length > 0
+          ? directSubjects
+          : [...fallbackTheorySubjects, ...fallbackPracticalSubjects];
 
         setAttendance({
           overall: summary.attendance || 0,
           bySubject: attendanceBySubject.length > 0 
             ? attendanceBySubject.map(sub => ({
-                subject: sub.subjectName,
-                attended: sub.attendedClasses,
-                total: sub.totalClasses,
-                percentage: ((sub.attendedClasses / sub.totalClasses) * 100).toFixed(1)
+                subject: sub.subjectName || sub.subject || 'Subject',
+                attended: Number(sub.attendedClasses || 0),
+                total: Number(sub.totalClasses || 0),
+                percentage: Number(sub.totalClasses || 0) > 0
+                  ? ((Number(sub.attendedClasses || 0) / Number(sub.totalClasses || 0)) * 100).toFixed(1)
+                  : '0.0'
               }))
             : [
                 { subject: 'Data Structures', attended: 45, total: 50, percentage: 90 },
@@ -511,6 +555,59 @@ const StudentDashboard = () => {
       setMockData();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchErpContext = async (showLoader = false) => {
+    try {
+      if (showLoader) {
+        setErpLoading(true);
+      }
+
+      const token = localStorage.getItem('token');
+      const [bridgeResponse, summaryResponse, workItemsResponse] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/dashboard/erp/bridge`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API_BASE_URL}/api/work-items/summary`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API_BASE_URL}/api/work-items/my?limit=6`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+
+      setErpBridge(bridgeResponse.data || null);
+      const summary = summaryResponse.data?.summary || {};
+      setErpSummary({
+        active: Number(summary.active || 0),
+        open: Number(summary.open || 0),
+        inProgress: Number(summary.inProgress || 0),
+        blocked: Number(summary.blocked || 0),
+        closed: Number(summary.closed || 0)
+      });
+      setErpWorkItems(Array.isArray(workItemsResponse.data?.items) ? workItemsResponse.data.items : []);
+      setErpError('');
+    } catch (error) {
+      setErpError(error.response?.data?.message || error.message || 'Failed to load workflow data');
+    } finally {
+      if (showLoader) {
+        setErpLoading(false);
+      }
+    }
+  };
+
+  const handleWorkItemStatusUpdate = async (itemId, status) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `${API_BASE_URL}/api/work-items/${itemId}/status`,
+        { status, note: `Updated via student dashboard (${status})` },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      await fetchErpContext(false);
+    } catch (error) {
+      setErpError(error.response?.data?.message || error.message || 'Failed to update workflow item status');
     }
   };
 
@@ -1088,8 +1185,9 @@ const StudentDashboard = () => {
                 </div>
               </div>
 
+              <div className="student-dashboard-cards-grid">
               {/* Performance Predictions */}
-              <div className="card">
+              <div className="card erp-work-card ai-wide-card">
                 <div className="card-header">
                   <h2 className="card-title"><FaCog /> AI Performance Predictions</h2>
                 </div>
@@ -1136,8 +1234,108 @@ const StudentDashboard = () => {
                 </div>
               </div>
 
+              <div className="card workflow-wide-card">
+                <div className="card-header">
+                  <h2 className="card-title"><FaBriefcase /> Workflow Support Desk</h2>
+                </div>
+                <div className="card-body">
+                  {erpError && <div className="alert alert-warning" style={{ marginBottom: '0.75rem' }}>{erpError}</div>}
+                  {erpLoading ? (
+                    <div style={{ textAlign: 'center', padding: '1rem' }}>
+                      <div className="spinner"></div>
+                      Loading workflow support data...
+                    </div>
+                  ) : (
+                    <>
+                      <div className="stats-grid erp-stats-grid" style={{ marginBottom: '1rem' }}>
+                        <div className="stat-card">
+                          <div className="stat-icon"><FaClipboardList /></div>
+                          <div className="stat-info">
+                            <h3>{erpSummary.active}</h3>
+                            <p>Active Tickets</p>
+                          </div>
+                        </div>
+                        <div className="stat-card">
+                          <div className="stat-icon"><FaClock /></div>
+                          <div className="stat-info">
+                            <h3>{erpSummary.open}</h3>
+                            <p>Open</p>
+                          </div>
+                        </div>
+                        <div className="stat-card">
+                          <div className="stat-icon"><FaCheckCircle /></div>
+                          <div className="stat-info">
+                            <h3>{erpSummary.inProgress}</h3>
+                            <p>In Progress</p>
+                          </div>
+                        </div>
+                        <div className="stat-card">
+                          <div className="stat-icon"><FaCheck /></div>
+                          <div className="stat-info">
+                            <h3>{erpSummary.closed}</h3>
+                            <p>Closed</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {erpBridge?.cohortContext?.assignment ? (
+                        <div className="alert alert-info" style={{ marginBottom: '1rem' }}>
+                          Assigned Faculty Mentor: {erpBridge.cohortContext.assignment.primaryFacultyId || 'Not assigned'}
+                          {' '}
+                          for {erpBridge.cohortContext.student?.year || '-'}-{erpBridge.cohortContext.student?.division || '-'}
+                        </div>
+                      ) : (
+                        <div className="alert alert-warning" style={{ marginBottom: '1rem' }}>
+                          Cohort faculty assignment not available yet for your class.
+                        </div>
+                      )}
+
+                      {erpWorkItems.length === 0 ? (
+                        <p style={{ color: 'var(--text-secondary)' }}>No workflow tickets assigned to you right now.</p>
+                      ) : (
+                        <div className="table-responsive">
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>Title</th>
+                                <th>Module</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {erpWorkItems.map((item) => (
+                                <tr key={item._id}>
+                                  <td>{item.title}</td>
+                                  <td>{item.module}</td>
+                                  <td>{item.status}</td>
+                                  <td>
+                                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                      {item.status !== 'in_progress' && item.status !== 'closed' && (
+                                        <button className="btn btn-secondary" onClick={() => handleWorkItemStatusUpdate(item._id, 'in_progress')}>
+                                          Start
+                                        </button>
+                                      )}
+                                      {item.status !== 'closed' && (
+                                        <button className="btn btn-success" onClick={() => handleWorkItemStatusUpdate(item._id, 'closed')}>
+                                          Close
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
               {/* Attendance Details */}
-              <div className="card">
+              <div className="card analysis-wide-card">
                 <div className="card-header">
                   <h2 className="card-title"><FaBullseye /> Full Analysis Overview</h2>
                 </div>
@@ -1169,7 +1367,7 @@ const StudentDashboard = () => {
                       </div>
 
                       {Array.isArray(fullAnalysis?.individual?.performance?.recommendations) && fullAnalysis.individual.performance.recommendations.length > 0 && (
-                        <div style={{ marginBottom: '1rem' }}>
+                        <div className="analysis-recommendations-card" style={{ marginBottom: '1rem' }}>
                           <h4>Personalized Recommendations</h4>
                           <ul>
                             {fullAnalysis.individual.performance.recommendations.slice(0, 6).map((rec, idx) => (
@@ -1179,7 +1377,7 @@ const StudentDashboard = () => {
                         </div>
                       )}
 
-                      <div className="charts-grid" style={{ marginBottom: '1rem' }}>
+                      <div className="charts-grid analysis-overview-grid" style={{ marginBottom: '1rem' }}>
                         <div className="chart-card">
                           <h3>Performance Components</h3>
                           <div className="chart-container">
@@ -1236,7 +1434,7 @@ const StudentDashboard = () => {
               </div>
 
               {/* Attendance Details */}
-              <div className="card">
+              <div className="card attendance-details-card">
                 <div className="card-header">
                   <h2 className="card-title"><FaCalendar /> Attendance Details</h2>
                 </div>
@@ -1246,9 +1444,9 @@ const StudentDashboard = () => {
                       <thead>
                         <tr>
                           <th>Subject</th>
-                          <th>Attended</th>
-                          <th>Total</th>
-                          <th>Percentage</th>
+                          <th className="numeric-col">Attended</th>
+                          <th className="numeric-col">Total</th>
+                          <th className="numeric-col">Percentage</th>
                           <th>Status</th>
                         </tr>
                       </thead>
@@ -1256,9 +1454,9 @@ const StudentDashboard = () => {
                         {attendance?.bySubject.map((item, index) => (
                           <tr key={index}>
                             <td>{item.subject}</td>
-                            <td>{item.attended}</td>
-                            <td>{item.total}</td>
-                            <td>
+                            <td className="numeric-col">{item.attended}</td>
+                            <td className="numeric-col">{item.total}</td>
+                            <td className="numeric-col">
                               <div className="percentage-bar">
                                 <div 
                                   className="percentage-fill"
@@ -1282,7 +1480,7 @@ const StudentDashboard = () => {
               </div>
 
               {/* Quick Actions */}
-              <div className="quick-actions-section">
+              <div className="quick-actions-section quick-actions-card">
                 <h3>Quick Actions</h3>
                 <div className="quick-actions-grid">
                   <button className="quick-action-btn" onClick={() => setActiveTab('Schedule')}>
@@ -1306,6 +1504,7 @@ const StudentDashboard = () => {
                     <span>Study Materials</span>
                   </button>
                 </div>
+              </div>
               </div>
             </>
           ) : (

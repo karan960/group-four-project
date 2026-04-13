@@ -24,8 +24,8 @@ import {
   FaChevronLeft, FaGraduationCap, FaChartBar, FaBookOpen, FaEdit,
   FaCalendar, FaHome, FaCheckCircle, FaClock, FaFileAlt, FaLock, FaQrcode, FaBriefcase
 } from 'react-icons/fa';
-import './FacultyDashboard.css';
 import './StudentDashboard.css';
+import './FacultyDashboard.css';
 
 const localStorage = window.sessionStorage;
 const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`;
@@ -297,6 +297,11 @@ const FacultyDashboard = () => {
   const [approvedStudentsForSession, setApprovedStudentsForSession] = useState([]);
   const [pastPlacements, setPastPlacements] = useState([]);
   const [pastPlacementsLoading, setPastPlacementsLoading] = useState(false);
+  const [erpBridge, setErpBridge] = useState(null);
+  const [erpSummary, setErpSummary] = useState({ active: 0, open: 0, inProgress: 0, blocked: 0, closed: 0 });
+  const [erpWorkItems, setErpWorkItems] = useState([]);
+  const [erpLoading, setErpLoading] = useState(false);
+  const [erpError, setErpError] = useState('');
   const preloadedStudentAnalysisIdsRef = useRef(new Set());
 
   const selectedPerformance = selectedStudentAnalysis?.individual?.performance || {};
@@ -610,6 +615,14 @@ const FacultyDashboard = () => {
   }, [activeTab, facultyData?._id, studentsYearFilter]);
 
   useEffect(() => {
+    if (activeTab !== 'Dashboard') return undefined;
+
+    fetchErpContext(true);
+    const interval = setInterval(() => fetchErpContext(false), 20000);
+    return () => clearInterval(interval);
+  }, [activeTab]);
+
+  useEffect(() => {
     if (activeTab !== 'MarkAttendance') return undefined;
 
     fetchActiveAttendanceSession();
@@ -809,6 +822,53 @@ const FacultyDashboard = () => {
       if (showLoading) {
         setStudentsAnalysisLoading(false);
       }
+    }
+  };
+
+  const fetchErpContext = async (showLoader = false) => {
+    try {
+      if (showLoader) {
+        setErpLoading(true);
+      }
+
+      const token = localStorage.getItem('token');
+      const [bridgeResponse, summaryResponse, workItemsResponse] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/dashboard/erp/bridge`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API_BASE_URL}/api/work-items/summary`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API_BASE_URL}/api/work-items/my?limit=6`, { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+
+      setErpBridge(bridgeResponse.data || null);
+      const summary = summaryResponse.data?.summary || {};
+      setErpSummary({
+        active: Number(summary.active || 0),
+        open: Number(summary.open || 0),
+        inProgress: Number(summary.inProgress || 0),
+        blocked: Number(summary.blocked || 0),
+        closed: Number(summary.closed || 0)
+      });
+      setErpWorkItems(Array.isArray(workItemsResponse.data?.items) ? workItemsResponse.data.items : []);
+      setErpError('');
+    } catch (error) {
+      setErpError(error.response?.data?.message || error.message || 'Failed to load workflow data');
+    } finally {
+      if (showLoader) {
+        setErpLoading(false);
+      }
+    }
+  };
+
+  const handleWorkItemStatusUpdate = async (itemId, status) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `${API_BASE_URL}/api/work-items/${itemId}/status`,
+        { status, note: `Updated via faculty dashboard (${status})` },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      await fetchErpContext(false);
+    } catch (error) {
+      setErpError(error.response?.data?.message || error.message || 'Failed to update workflow item status');
     }
   };
 
@@ -1801,8 +1861,10 @@ const FacultyDashboard = () => {
                 </div>
               </div>
 
+              <div className="faculty-dashboard-cards-grid">
+
               {/* Teaching Subjects */}
-              <div className="card">
+              <div className="card erp-work-card teaching-wide-card">
                 <div className="card-header">
                   <h2 className="card-title"><FaBook /> Teaching Subjects</h2>
                 </div>
@@ -1841,8 +1903,102 @@ const FacultyDashboard = () => {
                 </div>
               </div>
 
+              <div className="card workflow-wide-card">
+                <div className="card-header">
+                  <h2 className="card-title"><FaBriefcase /> Workflow Inbox</h2>
+                </div>
+                <div className="card-body">
+                  {erpError && <div className="alert alert-warning" style={{ marginBottom: '0.75rem' }}>{erpError}</div>}
+                  {erpLoading ? (
+                    <div style={{ textAlign: 'center', padding: '1rem' }}>
+                      <div className="spinner"></div>
+                      Loading workflow data...
+                    </div>
+                  ) : (
+                    <>
+                      <div className="stats-grid erp-stats-grid" style={{ marginBottom: '1rem' }}>
+                        <div className="stat-card">
+                          <div className="stat-icon"><FaClipboardList /></div>
+                          <div className="stat-info">
+                            <h3>{erpSummary.active}</h3>
+                            <p>Active Items</p>
+                          </div>
+                        </div>
+                        <div className="stat-card">
+                          <div className="stat-icon"><FaClock /></div>
+                          <div className="stat-info">
+                            <h3>{erpSummary.open}</h3>
+                            <p>Open</p>
+                          </div>
+                        </div>
+                        <div className="stat-card">
+                          <div className="stat-icon"><FaCheckCircle /></div>
+                          <div className="stat-info">
+                            <h3>{erpSummary.inProgress}</h3>
+                            <p>In Progress</p>
+                          </div>
+                        </div>
+                        <div className="stat-card">
+                          <div className="stat-icon"><FaCheck /></div>
+                          <div className="stat-info">
+                            <h3>{erpSummary.closed}</h3>
+                            <p>Closed</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {erpBridge?.cohortContext?.cohorts?.length > 0 && (
+                        <div className="alert alert-info" style={{ marginBottom: '1rem' }}>
+                          Assigned Cohorts: {erpBridge.cohortContext.cohorts.map((cohort) => `${cohort.year}-${cohort.division}`).join(', ')}
+                        </div>
+                      )}
+
+                      {erpWorkItems.length === 0 ? (
+                        <p style={{ color: 'var(--text-secondary)' }}>No workflow items assigned right now.</p>
+                      ) : (
+                        <div className="table-responsive">
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>Title</th>
+                                <th>Priority</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {erpWorkItems.map((item) => (
+                                <tr key={item._id}>
+                                  <td>{item.title}</td>
+                                  <td>{item.priority}</td>
+                                  <td>{item.status}</td>
+                                  <td>
+                                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                      {item.status !== 'in_progress' && item.status !== 'closed' && (
+                                        <button className="btn btn-secondary" onClick={() => handleWorkItemStatusUpdate(item._id, 'in_progress')}>
+                                          Start
+                                        </button>
+                                      )}
+                                      {item.status !== 'closed' && (
+                                        <button className="btn btn-success" onClick={() => handleWorkItemStatusUpdate(item._id, 'closed')}>
+                                          Close
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
               {/* Quick Actions */}
-              <div className="quick-actions-section">
+              <div className="quick-actions-section quick-actions-card">
                 <h3>Quick Actions</h3>
                 <div className="quick-actions-grid">
                   <button className="quick-action-btn" onClick={() => setActiveTab('MarkAttendance')}>
@@ -1865,7 +2021,7 @@ const FacultyDashboard = () => {
               </div>
 
               {/* Recent Activities */}
-              <div className="card">
+              <div className="card activity-wide-card">
                 <div className="card-header">
                   <h2 className="card-title"><FaClock /> Recent Activities</h2>
                 </div>
@@ -1902,6 +2058,7 @@ const FacultyDashboard = () => {
                     ))}
                   </div>
                 </div>
+              </div>
               </div>
             </>
           ) : (
@@ -2587,16 +2744,16 @@ const FacultyDashboard = () => {
                             <p className="confidence-label">No attendance sessions found yet.</p>
                           ) : (
                             <div className="table-responsive">
-                              <table className="data-table">
+                              <table className="data-table session-table">
                                 <thead>
                                   <tr>
                                     <th>Session Code</th>
                                     <th>Subject</th>
                                     <th>Status</th>
-                                    <th>Created At</th>
+                                    <th className="nowrap-col">Created At</th>
                                     <th>Approved</th>
                                     <th>Pending</th>
-                                    <th>Action</th>
+                                    <th className="nowrap-col">Action</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -2605,10 +2762,10 @@ const FacultyDashboard = () => {
                                       <td>{sessionRow.sessionCode}</td>
                                       <td>{sessionRow.subjectName}</td>
                                       <td>{sessionRow.status}</td>
-                                      <td>{new Date(sessionRow.createdAt).toLocaleString()}</td>
+                                      <td className="nowrap-col">{new Date(sessionRow.createdAt).toLocaleString()}</td>
                                       <td>{sessionRow.approvedCount || 0}</td>
                                       <td>{sessionRow.pendingCount || 0}</td>
-                                      <td>
+                                      <td className="nowrap-col">
                                         <button
                                           className="btn btn-primary"
                                           onClick={() => handleViewApprovedStudents(sessionRow._id)}
