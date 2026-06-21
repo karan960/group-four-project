@@ -889,3 +889,289 @@ html:not(.dark) .homepage .footer {
   background: linear-gradient(180deg, rgba(206, 222, 255, 0.28) 0%, rgba(214, 228, 255, 0.68) 40%, rgba(230, 238, 255, 0.9) 100%);
   border-top-color: rgba(122, 157, 240, 0.3);
 }
+
+/* ========================================
+   HOMEPAGE MOBILE RESPONSIVE
+   ======================================== */
+
+@media (max-width: 479px) {
+  /* Extra Small Screens */
+  .nav-container {
+    gap: 0.5rem;
+    min-height: 70px;
+  }
+
+  .homepage .logo-text h2 {
+    font-size: 1.2rem;
+  }
+
+  .nav-menu {
+    gap: 0.5rem;
+  }
+
+  .nav-link {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .nav-btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+    min-height: 40px;
+  }
+
+  .hero-section {
+    padding: 3rem 1rem;
+  }
+
+  .hero-content h1 {
+    font-size: clamp(1.5rem, 5vw, 2rem);
+  }
+
+  .hero-content p {
+    font-size: 0.95rem;
+    margin: 0.75rem 0;
+  }
+
+  .hero-actions {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .hero-actions .btn {
+    padding: 0.75rem 1.25rem;
+    font-size: 0.9rem;
+    min-width: auto;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .feature-item {
+    padding: 1.25rem;
+  }
+
+  .feature-item h4 {
+    font-size: 1.1rem;
+  }
+
+  .feature-item p {
+    font-size: 0.9rem;
+  }
+
+  .faculty-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .faculty-card {
+    padding: 1.25rem;
+  }
+
+  .faculty-avatar {
+    width: 60px;
+    height: 60px;
+  }
+
+  .faculty-avatar svg {
+    font-size: 1.8rem;
+  }
+
+  .faculty-name {
+    font-size: 1rem;
+  }
+
+  .faculty-designation,
+  .faculty-department {
+    font-size: 0.85rem;
+  }
+
+  .analytics-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .analytics-card {
+    padding: 1.25rem;
+  }
+
+  .metric-figure {
+    font-size: 1.8rem;
+  }
+
+  .metric-label {
+    font-size: 0.85rem;
+  }
+
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .footer-section h4 {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .container {
+    padding: 0 0.75rem;
+  }
+
+  .section-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+  }
+
+  .section-header h2 {
+    font-size: clamp(1.3rem, 4vw, 1.8rem);
+  }
+
+  .section-header p {
+    font-size: 0.9rem;
+  }
+}
+
+@media (min-width: 480px) and (max-width: 767px) {
+  /* Small Tablets */
+  .hero-section {
+    padding: 3.5rem 1.5rem;
+  }
+
+  .hero-content h1 {
+    font-size: clamp(1.7rem, 5vw, 2.2rem);
+  }
+
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+  }
+
+  .faculty-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+  }
+
+  .analytics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+  }
+
+  .footer-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .container {
+    padding: 0 1rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Tablets */
+  .hero-section {
+    padding: 4rem 1.5rem;
+  }
+
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .faculty-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .analytics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .footer-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+  }
+
+  .container {
+    padding: 0 1.5rem;
+  }
+
+  .nav-container {
+    padding: 0 1rem;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1439px) {
+  /* Small Desktops */
+  .features-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .faculty-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+  }
+
+  .analytics-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .footer-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2rem;
+  }
+}
+
+@media (min-width: 1440px) {
+  /* Large Desktops */
+  .features-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .faculty-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .analytics-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .footer-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* Touch-friendly adjustments */
+@media (hover: none) and (pointer: coarse) {
+  .nav-link,
+  .btn,
+  .feature-item,
+  .faculty-card,
+  .analytics-card {
+    min-height: 44px;
+  }
+
+  .nav-link:hover {
+    background: none;
+  }
+
+  .feature-item:hover,
+  .faculty-card:hover,
+  .analytics-card:hover {
+    transform: none;
+  }
+
+  .nav-link:active {
+    opacity: 0.8;
+  }
+
+  .feature-item:active,
+  .faculty-card:active,
+  .analytics-card:active {
+    opacity: 0.9;
+  }
+}

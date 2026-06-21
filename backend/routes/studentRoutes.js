@@ -41,14 +41,12 @@ router.get('/placements', async (req, res) => {
     const yearWiseSummary = students.reduce((acc, student) => {
       const studentYear = student.year || 'Unknown';
       if (!acc[studentYear]) {
-        acc[studentYear] = { total: 0, placed: 0, eligible: 0, notEligible: 0, higherStudies: 0 };
+        acc[studentYear] = { total: 0, placed: 0, notPlaced: 0 };
       }
 
       acc[studentYear].total += 1;
       if (student.placementStatus === 'Placed') acc[studentYear].placed += 1;
-      if (student.placementStatus === 'Eligible') acc[studentYear].eligible += 1;
-      if (student.placementStatus === 'Not Eligible') acc[studentYear].notEligible += 1;
-      if (student.placementStatus === 'Higher Studies') acc[studentYear].higherStudies += 1;
+      if (student.placementStatus === 'Not Placed') acc[studentYear].notPlaced += 1;
 
       return acc;
     }, {});
@@ -64,39 +62,47 @@ router.get('/placements', async (req, res) => {
 });
 
 // PUT update student placement details (admin)
+// Auto-sets placement status to 'Placed' if company and package are provided, 'Not Placed' otherwise
 router.put('/placements/:prn', async (req, res) => {
   try {
     if (!ensureAdmin(req, res)) return;
 
-    const { placementStatus, companyName, package: offeredPackage, offerLetterDate } = req.body;
-
-    if (!placementStatus) {
-      return res.status(400).json({ message: 'placementStatus is required' });
-    }
+    const { companyName, package: offeredPackage, offerLetterDate } = req.body;
 
     const student = await Student.findOne({ prn: req.params.prn, isActive: true });
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    const normalizedStatus = String(placementStatus).trim();
     const normalizedCompany = String(companyName || '').trim();
     const parsedPackage = offeredPackage === '' || offeredPackage === null || offeredPackage === undefined
       ? null
       : Number(offeredPackage);
 
-    if (normalizedStatus === 'Placed') {
-      if (!normalizedCompany) {
-        return res.status(400).json({ message: 'companyName is required when student is placed' });
-      }
-      if (!Number.isFinite(parsedPackage) || parsedPackage <= 0) {
-        return res.status(400).json({ message: 'Valid package is required when student is placed' });
-      }
+    // Auto-determine placement status based on company and package
+    // Status = 'Placed' only if BOTH company and valid package are provided
+    const hasCompany = normalizedCompany.length > 0;
+    const hasValidPackage = Number.isFinite(parsedPackage) && parsedPackage > 0;
+    
+    let placementStatus = 'Not Placed';
+    let errorMessage = null;
+
+    // Check for partial data (one provided but not the other)
+    if (hasCompany && !hasValidPackage) {
+      errorMessage = 'Package (LPA) is required to mark student as placed. Please enter a valid number greater than 0.';
+    } else if (!hasCompany && hasValidPackage) {
+      errorMessage = 'Company name is required to mark student as placed.';
+    } else if (hasCompany && hasValidPackage) {
+      placementStatus = 'Placed';
     }
 
-    student.placementStatus = normalizedStatus;
-    student.companyName = normalizedStatus === 'Placed' ? normalizedCompany : (normalizedCompany || '');
-    student.package = normalizedStatus === 'Placed' ? parsedPackage : null;
+    if (errorMessage) {
+      return res.status(400).json({ message: errorMessage });
+    }
+
+    student.placementStatus = placementStatus;
+    student.companyName = placementStatus === 'Placed' ? normalizedCompany : '';
+    student.package = placementStatus === 'Placed' ? parsedPackage : null;
     student.offerLetterDate = offerLetterDate ? new Date(offerLetterDate) : null;
     student.lastUpdated = Date.now();
     student.updatedBy = req.user?.username || 'admin';

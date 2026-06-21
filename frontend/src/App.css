@@ -2052,6 +2052,7 @@ h1, h2, h3, .card-title, .dashboard-header h1, .section-header h1 {
 
 /* 4. Global Card Padding & Subtle Inner Glow (admin only) */
 .admin-dashboard .card {
+  width: 100 !important;
   padding: 2.5rem !important;
   box-shadow: var(--shadow-md), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important;
 }

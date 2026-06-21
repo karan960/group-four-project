@@ -133,8 +133,8 @@ const studentSchema = new mongoose.Schema({
   // Placement Information
   placementStatus: { 
     type: String, 
-    enum: ['Not Eligible', 'Eligible', 'Placed', 'Higher Studies'],
-    default: 'Not Eligible'
+    enum: ['Placed', 'Not Placed'],
+    default: 'Not Placed'
   },
   companyName: { type: String },
   package: { type: Number },

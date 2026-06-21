@@ -481,13 +481,55 @@ const DashboardOverview = () => {
   const [erpError, setErpError] = useState('');
   const [cohortSaveStatus, setCohortSaveStatus] = useState('');
   const REFRESH_INTERVAL = 10000;
+  const ML_PROBE_INTERVAL_MS = 60000;
+  const mlLastProbeRef = useRef(0);
+
+  const normalizeAcademicYear = (value) => {
+    const token = String(value || '').trim().toUpperCase();
+    const yearMap = {
+      '1': 'First',
+      'I': 'First',
+      'FIRST': 'First',
+      'FIRST YEAR': 'First',
+      'FE': 'First',
+      '2': 'Second',
+      'II': 'Second',
+      'SECOND': 'Second',
+      'SECOND YEAR': 'Second',
+      'SE': 'Second',
+      '3': 'Third',
+      'III': 'Third',
+      'THIRD': 'Third',
+      'THIRD YEAR': 'Third',
+      'TE': 'Third',
+      'TY': 'Third',
+      '4': 'Fourth',
+      'IV': 'Fourth',
+      'FOURTH': 'Fourth',
+      'FOURTH YEAR': 'Fourth',
+      'BE': 'Fourth',
+      'FY': 'Fourth'
+    };
+
+    return yearMap[token] || '';
+  };
 
   const toYearWiseStudents = (byYear = {}) => ({
-    First: byYear.First || byYear['First Year'] || byYear['1'] || byYear[1] || byYear['I'] || 0,
-    Second: byYear.Second || byYear['Second Year'] || byYear['2'] || byYear[2] || byYear['II'] || 0,
-    Third: byYear.Third || byYear['Third Year'] || byYear['3'] || byYear[3] || byYear['III'] || 0,
-    Fourth: byYear.Fourth || byYear['Fourth Year'] || byYear['4'] || byYear[4] || byYear['IV'] || 0
+    First: 0,
+    Second: 0,
+    Third: 0,
+    Fourth: 0
   });
+
+  const aggregateYearWiseStudents = (byYear = {}) => {
+    const normalized = toYearWiseStudents();
+    Object.entries(byYear || {}).forEach(([rawYear, rawCount]) => {
+      const key = normalizeAcademicYear(rawYear);
+      if (!key || !Object.prototype.hasOwnProperty.call(normalized, key)) return;
+      normalized[key] += Number(rawCount || 0);
+    });
+    return normalized;
+  };
 
   useEffect(() => {
     fetchDashboardStats(true);
@@ -529,11 +571,23 @@ const DashboardOverview = () => {
         setLoading(true);
       }
 
+      const shouldProbeMl = showLoader || !mlServiceUnavailable || (Date.now() - mlLastProbeRef.current >= ML_PROBE_INTERVAL_MS);
+      if (shouldProbeMl) {
+        mlLastProbeRef.current = Date.now();
+      }
+
+      const modelInfoPromise = shouldProbeMl
+        ? api.get('/api/ml-analysis/model-info')
+        : Promise.resolve({ data: null, skipped: true });
+      const institutionStatsPromise = shouldProbeMl
+        ? api.get('/api/ml-analysis/institution-stats')
+        : Promise.resolve({ data: null, skipped: true });
+
       const [overviewResponse, dashboardResponse, modelInfoResponse, institutionStatsResponse] = await Promise.allSettled([
         api.get('/api/dashboard/admin/overview'),
         api.get('/api/dashboard/admin/dashboard'),
-        api.get('/api/ml-analysis/model-info'),
-        api.get('/api/ml-analysis/institution-stats')
+        modelInfoPromise,
+        institutionStatsPromise
       ]);
 
       const overviewStats = overviewResponse.status === 'fulfilled' ? (overviewResponse.value?.data?.stats || {}) : {};
@@ -543,7 +597,9 @@ const DashboardOverview = () => {
       const institutionStats = institutionStatsResponse.status === 'fulfilled'
         ? (institutionStatsResponse.value?.data?.statistics || {})
         : {};
-      const mlOnline = modelInfoResponse.status === 'fulfilled' && institutionStatsResponse.status === 'fulfilled';
+      const mlOnline = shouldProbeMl
+        ? (modelInfoResponse.status === 'fulfilled' && institutionStatsResponse.status === 'fulfilled')
+        : !mlServiceUnavailable;
       const rawAccuracy = typeof modelInfo.accuracy === 'number'
         ? modelInfo.accuracy
         : Number((modelInfo.metrics?.accuracy || 0) * 100);
@@ -553,7 +609,7 @@ const DashboardOverview = () => {
         totalFaculty: Number(overviewStats.totalFaculty ?? dashboardData?.facultyStats?.total ?? 0),
         totalUsers: Number(overviewStats.totalUsers ?? 0),
         mlAccuracy: Number.isFinite(rawAccuracy) ? Number(rawAccuracy.toFixed(2)) : 0,
-        yearWiseStudents: toYearWiseStudents(studentStats.byYear || {}),
+        yearWiseStudents: aggregateYearWiseStudents(studentStats.byYear || {}),
         performanceDistribution: normalizeDistribution(institutionStats.performance_distribution || {})
       });
       setMlServiceUnavailable(!mlOnline);
@@ -601,8 +657,9 @@ const DashboardOverview = () => {
 
       const yearWiseCounts = { First: 0, Second: 0, Third: 0, Fourth: 0 };
       studentsData.forEach(student => {
-        if (yearWiseCounts.hasOwnProperty(student.year)) {
-          yearWiseCounts[student.year]++;
+        const normalizedYear = normalizeAcademicYear(student.year);
+        if (Object.prototype.hasOwnProperty.call(yearWiseCounts, normalizedYear)) {
+          yearWiseCounts[normalizedYear]++;
         }
       });
 
@@ -2340,7 +2397,6 @@ const PlacementManagement = () => {
   const [showcaseError, setShowcaseError] = useState('');
   const [editingPlacement, setEditingPlacement] = useState(null);
   const [placementForm, setPlacementForm] = useState({
-    placementStatus: 'Not Eligible',
     companyName: '',
     package: '',
     offerLetterDate: ''
@@ -2396,7 +2452,6 @@ const PlacementManagement = () => {
   const handleOpenPlacementEdit = (student) => {
     setEditingPlacement(student);
     setPlacementForm({
-      placementStatus: student.placementStatus || 'Not Eligible',
       companyName: student.companyName || '',
       package: student.package || '',
       offerLetterDate: student.offerLetterDate ? new Date(student.offerLetterDate).toISOString().slice(0, 10) : ''
@@ -2562,7 +2617,7 @@ const PlacementManagement = () => {
                   <div className="stat-icon"><FaGraduationCap /></div>
                   <div className="stat-info">
                     <h3>{year}</h3>
-                    <p>Total: {summary.total} | Placed: {summary.placed}</p>
+                    <p>Total: {summary.total} | Placed: {summary.placed} | Not Placed: {summary.notPlaced}</p>
                   </div>
                 </div>
               ))
@@ -2681,10 +2736,8 @@ const PlacementManagement = () => {
             </select>
             <select className="form-control" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">All Status</option>
-              <option value="Not Eligible">Not Eligible</option>
-              <option value="Eligible">Eligible</option>
               <option value="Placed">Placed</option>
-              <option value="Higher Studies">Higher Studies</option>
+              <option value="Not Placed">Not Placed</option>
             </select>
             <input
               className="form-control"
@@ -2754,37 +2807,41 @@ const PlacementManagement = () => {
               <button onClick={() => setEditingPlacement(null)} className="btn-close">×</button>
             </div>
             <div className="modal-body">
+              {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>{error}</div>}
+              
+              <div style={{ padding: '1rem', marginBottom: '1rem', backgroundColor: 'rgba(33, 150, 243, 0.1)', borderRadius: '4px', borderLeft: '4px solid #2196F3' }}>
+                <p style={{ margin: 0, fontSize: '0.9rem' }}>
+                  <strong>Status Update Rules:</strong>
+                  <br/>• <strong>"Placed"</strong>: Fill in both company name AND package<br/>
+                  • <strong>"Not Placed"</strong>: Leave both fields empty
+                </p>
+              </div>
+              
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Status</label>
-                  <select
-                    value={placementForm.placementStatus}
-                    onChange={(e) => setPlacementForm({ ...placementForm, placementStatus: e.target.value })}
-                  >
-                    <option value="Not Eligible">Not Eligible</option>
-                    <option value="Eligible">Eligible</option>
-                    <option value="Placed">Placed</option>
-                    <option value="Higher Studies">Higher Studies</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Company Name</label>
+                  <label>Company Name {placementForm.companyName && placementForm.package && '✓'}</label>
                   <input
                     type="text"
                     value={placementForm.companyName}
                     onChange={(e) => setPlacementForm({ ...placementForm, companyName: e.target.value })}
+                    placeholder="e.g., Google, Microsoft, Amazon"
+                    style={{ borderColor: placementForm.companyName ? '#4CAF50' : 'initial' }}
                   />
                 </div>
                 <div className="form-group">
-                  <label>Package (LPA)</label>
+                  <label>Package (LPA) {placementForm.package && placementForm.companyName && '✓'}</label>
                   <input
                     type="number"
                     value={placementForm.package}
                     onChange={(e) => setPlacementForm({ ...placementForm, package: e.target.value })}
+                    placeholder="e.g., 10.5"
+                    min="0"
+                    step="0.1"
+                    style={{ borderColor: placementForm.package && placementForm.package > 0 ? '#4CAF50' : 'initial' }}
                   />
                 </div>
                 <div className="form-group">
-                  <label>Offer Date</label>
+                  <label>Offer Date (Optional)</label>
                   <input
                     type="date"
                     value={placementForm.offerLetterDate}
@@ -2795,7 +2852,11 @@ const PlacementManagement = () => {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setEditingPlacement(null)}>Cancel</button>
-              <button className="btn btn-success" onClick={handleSavePlacement}>Save Placement</button>
+              <button className="btn btn-success" onClick={handleSavePlacement}>
+                {!placementForm.companyName && !placementForm.package 
+                  ? 'Mark as Not Placed' 
+                  : 'Mark as Placed'}
+              </button>
             </div>
           </div>
         </div>

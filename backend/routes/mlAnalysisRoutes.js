@@ -14,6 +14,17 @@ const ML_API_URL = RAW_ML_API_URL.includes('/api/ml/performance')
 const FULL_ANALYSIS_CACHE_TTL_MS = Number(process.env.FULL_ANALYSIS_CACHE_TTL_MS || 5 * 60 * 1000);
 const fullStudentAnalysisCache = new Map();
 const fullStudentAnalysisInFlight = new Map();
+const ML_ERROR_LOG_THROTTLE_MS = Number(process.env.ML_ERROR_LOG_THROTTLE_MS || 60 * 1000);
+const mlErrorLogState = new Map();
+
+const logMlErrorThrottled = (key, message) => {
+  const now = Date.now();
+  const lastLoggedAt = mlErrorLogState.get(key) || 0;
+  if (now - lastLoggedAt >= ML_ERROR_LOG_THROTTLE_MS) {
+    console.warn(message);
+    mlErrorLogState.set(key, now);
+  }
+};
 
 const findStudentByIdentifier = async (studentId) => {
   const normalizedId = String(studentId || '').trim();
@@ -577,7 +588,7 @@ router.get('/institution-stats', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error in institution stats:', error.message);
+    logMlErrorThrottled('institution-stats', `Error in institution stats: ${error.message}`);
     res.status(500).json({ 
       error: 'Failed to fetch institution statistics',
       details: error.message 
@@ -604,7 +615,7 @@ router.get('/model-info', async (req, res) => {
       lastTrained: latestRun?.trainedAt || response.data?.lastTrained || null
     });
   } catch (error) {
-    console.error('Error fetching model info:', error.message);
+    logMlErrorThrottled('model-info', `Error fetching model info: ${error.message}`);
     res.status(500).json({
       error: 'Failed to fetch model info',
       details: error.message

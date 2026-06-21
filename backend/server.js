@@ -447,6 +447,40 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
       updated: []
     };
 
+    const normalizeAcademicYear = (value) => {
+      const token = String(value || '').trim().toUpperCase();
+      const yearMap = {
+        '1': 'First',
+        'I': 'First',
+        'FIRST': 'First',
+        'FIRST YEAR': 'First',
+        'FE': 'First',
+        '2': 'Second',
+        'II': 'Second',
+        'SECOND': 'Second',
+        'SECOND YEAR': 'Second',
+        'SE': 'Second',
+        '3': 'Third',
+        'III': 'Third',
+        'THIRD': 'Third',
+        'THIRD YEAR': 'Third',
+        'TE': 'Third',
+        'TY': 'Third',
+        '4': 'Fourth',
+        'IV': 'Fourth',
+        'FOURTH': 'Fourth',
+        'FOURTH YEAR': 'Fourth',
+        'BE': 'Fourth',
+        'FY': 'Fourth'
+      };
+      return yearMap[token] || 'First';
+    };
+
+    const normalizeDivision = (value) => {
+      const token = String(value || '').trim().toUpperCase();
+      return ['A', 'B'].includes(token) ? token : 'A';
+    };
+
     if (type === 'students') {
       for (const [index, row] of data.entries()) {
         try {
@@ -469,6 +503,16 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
             admissionYear: getVal(row, 'admissionYear', 'students')
           };
 
+          const normalizedStudentData = {
+            ...studentData,
+            year: normalizeAcademicYear(studentData.year),
+            division: normalizeDivision(studentData.division),
+            branch: 'Information Technology',
+            department: 'Information Technology',
+            isActive: true,
+            lastUpdated: new Date()
+          };
+
           if (!studentData.prn || !studentData.rollNo || !studentData.studentName) {
             throw new Error('Missing required fields (PRN, Roll No, Name)');
           }
@@ -476,7 +520,11 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
           const existingStudent = await Student.findOne({ prn: studentData.prn });
           
           if (existingStudent) {
-            await Student.findOneAndUpdate({ prn: studentData.prn }, studentData);
+            await Student.findOneAndUpdate(
+              { prn: studentData.prn },
+              normalizedStudentData,
+              { runValidators: true }
+            );
             const defaultPassword = await bcrypt.hash(studentData.prn, 10);
             const existingUser = await User.findOne({ username: studentData.prn });
             if (existingUser) {
@@ -496,7 +544,7 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
             }
             results.updated.push(studentData.prn);
           } else {
-            const student = new Student(studentData);
+            const student = new Student(normalizedStudentData);
             await student.save();
 
             const defaultPassword = await bcrypt.hash(studentData.prn, 10);
@@ -938,6 +986,11 @@ app.post('/api/upload-excel', authMiddleware, adminMiddleware, upload.single('fi
     }
 
     fs.unlinkSync(filePath);
+
+    const uniqueCreated = [...new Set(results.created)];
+    const uniqueUpdated = [...new Set(results.updated)];
+    results.created = uniqueCreated;
+    results.updated = uniqueUpdated;
 
     // Log detailed results
     console.log('\n📋 UPLOAD SUMMARY:');

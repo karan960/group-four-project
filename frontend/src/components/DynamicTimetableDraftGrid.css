@@ -78,8 +78,55 @@
   box-shadow: var(--shadow-sm);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 479px) {
   .dynamic-draft-grid {
-    padding: 0.85rem;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .draft-grid-table th,
+  .draft-grid-table td {
+    min-width: 120px;
+    padding: 0.6rem 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .time-cell {
+    font-size: 0.85rem;
+  }
+
+  .empty-chip {
+    font-size: 0.75rem;
+    padding: 0.4rem;
+  }
+
+  .chip-title {
+    font-size: 0.9rem;
+  }
+
+  .chip-meta {
+    font-size: 0.7rem;
+  }
+
+  .subject-chip {
+    padding: 0.35rem 0.45rem;
+  }
+}
+
+@media (min-width: 480px) and (max-width: 767px) {
+  .dynamic-draft-grid {
+    padding: 0.8rem;
+  }
+
+  .draft-grid-table th,
+  .draft-grid-table td {
+    min-width: 140px;
+    padding: 0.7rem 0.6rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .dynamic-draft-grid {
+    padding: 1rem;
   }
 }

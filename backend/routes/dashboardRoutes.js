@@ -35,6 +35,36 @@ const parseLimit = (rawValue, defaultValue = 10, maxValue = 50) => {
   return Math.min(maxValue, Math.max(1, parsed));
 };
 
+const normalizeAcademicYear = (value) => {
+  const token = String(value || '').trim().toUpperCase();
+  const yearMap = {
+    '1': 'First',
+    'I': 'First',
+    'FIRST': 'First',
+    'FIRST YEAR': 'First',
+    'FE': 'First',
+    '2': 'Second',
+    'II': 'Second',
+    'SECOND': 'Second',
+    'SECOND YEAR': 'Second',
+    'SE': 'Second',
+    '3': 'Third',
+    'III': 'Third',
+    'THIRD': 'Third',
+    'THIRD YEAR': 'Third',
+    'TE': 'Third',
+    'TY': 'Third',
+    '4': 'Fourth',
+    'IV': 'Fourth',
+    'FOURTH': 'Fourth',
+    'FOURTH YEAR': 'Fourth',
+    'BE': 'Fourth',
+    'FY': 'Fourth'
+  };
+
+  return yearMap[token] || token || 'Unknown';
+};
+
 const buildClassScopeText = (scope = {}) => {
   const year = scope.year || 'ALL';
   const branch = scope.branch || 'ALL';
@@ -94,7 +124,8 @@ router.get('/admin/dashboard', async (req, res) => {
 
     students.forEach(student => {
       // By year
-      studentStats.byYear[student.year] = (studentStats.byYear[student.year] || 0) + 1;
+      const normalizedYear = normalizeAcademicYear(student.year);
+      studentStats.byYear[normalizedYear] = (studentStats.byYear[normalizedYear] || 0) + 1;
       
       // By branch
       studentStats.byBranch[student.branch] = (studentStats.byBranch[student.branch] || 0) + 1;

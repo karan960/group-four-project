@@ -809,20 +809,179 @@
   margin-bottom: 1.25rem !important;
 }
 
-@media (max-width: 1000px) {
+/* ========================================
+   FACULTY DASHBOARD MOBILE RESPONSIVE
+   ======================================== */
+
+@media (max-width: 479px) {
+  /* Extra Small Screens */
+  .faculty-dashboard {
+    flex-direction: column;
+  }
+
   .faculty-dashboard .sidebar {
-    width: 84px !important;
+    width: 60px !important;
+    height: 60px;
+    flex-direction: row;
+    position: static;
   }
 
   .faculty-dashboard .main-content {
-    margin-left: 84px !important;
-    width: calc(100vw - 84px) !important;
-    max-width: calc(100vw - 84px) !important;
+    margin-left: 0 !important;
+    margin-top: 0;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
   }
 
-  .faculty-dashboard .stats-grid,
-  .faculty-dashboard .charts-grid,
+  .faculty-dashboard .main-header {
+    padding: 0.75rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .faculty-dashboard .header-left h1 {
+    font-size: 1.25rem;
+  }
+
+  .faculty-dashboard .header-left p {
+    display: none;
+  }
+
+  .faculty-dashboard .header-right,
+  .faculty-dashboard .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 0.5rem;
+  }
+
+  .faculty-dashboard .page-content {
+    padding: 0.75rem !important;
+  }
+
+  .faculty-dashboard .stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .faculty-dashboard .stat-card {
+    padding: 1rem;
+    flex-direction: column;
+    text-align: center;
+    gap: 0.75rem;
+  }
+
+  .faculty-dashboard .stat-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
+    margin: 0 auto;
+  }
+
+  .faculty-dashboard .stat-icon svg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .faculty-dashboard .stat-info h3 {
+    font-size: 1.5rem;
+  }
+
+  .faculty-dashboard .charts-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
+
+  .faculty-dashboard .faculty-dashboard-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
+
   .faculty-dashboard .quick-actions-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem;
+  }
+
+  .faculty-dashboard .card {
+    padding: 1rem;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .faculty-dashboard .chart-card {
+    padding: 0.75rem;
+  }
+
+  .faculty-dashboard .chart-container {
+    height: 200px;
+  }
+
+  .faculty-dashboard .quick-action-btn {
+    padding: 1rem;
+    gap: 0.5rem;
+  }
+
+  .faculty-dashboard .action-icon {
+    font-size: 1.5rem;
+  }
+
+  .faculty-dashboard .table {
+    font-size: 11px;
+  }
+
+  .faculty-dashboard .table th,
+  .faculty-dashboard .table td {
+    padding: 0.4rem 0.25rem;
+  }
+
+  .faculty-dashboard .btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 12px;
+  }
+
+  .faculty-dashboard .section-header {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .faculty-dashboard .section-header h1 {
+    font-size: 1.3rem;
+  }
+
+  .faculty-dashboard .form-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 480px) and (max-width: 767px) {
+  /* Small Tablets */
+  .faculty-dashboard .sidebar {
+    width: 70px !important;
+  }
+
+  .faculty-dashboard .main-content {
+    margin-left: 70px !important;
+    width: calc(100vw - 70px) !important;
+    height: auto !important;
+  }
+
+  .faculty-dashboard .page-content {
+    padding: 1rem !important;
+  }
+
+  .faculty-dashboard .stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem;
+  }
+
+  .faculty-dashboard .stat-card {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .faculty-dashboard .charts-grid {
     grid-template-columns: 1fr !important;
   }
 
@@ -830,7 +989,110 @@
     grid-template-columns: 1fr !important;
   }
 
+  .faculty-dashboard .quick-actions-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .faculty-dashboard .table {
+    font-size: 12px;
+  }
+
+  .faculty-dashboard .table th,
+  .faculty-dashboard .table td {
+    padding: 0.5rem;
+  }
+
   .faculty-dashboard .form-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* Tablets */
+  .faculty-dashboard .sidebar {
+    width: 88px !important;
+  }
+
+  .faculty-dashboard .main-content {
+    margin-left: 88px !important;
+    width: calc(100vw - 88px) !important;
+    height: auto !important;
+  }
+
+  .faculty-dashboard .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1rem;
+  }
+
+  .faculty-dashboard .charts-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .faculty-dashboard .faculty-dashboard-cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .faculty-dashboard .quick-actions-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .faculty-dashboard .page-content {
+    padding: 1.25rem !important;
+  }
+
+  .faculty-dashboard .form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1439px) {
+  /* Small Desktops */
+  .faculty-dashboard .sidebar {
+    width: 280px !important;
+  }
+
+  .faculty-dashboard .main-content {
+    margin-left: 280px !important;
+    width: calc(100vw - 280px) !important;
+  }
+
+  .faculty-dashboard .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .faculty-dashboard .charts-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .faculty-dashboard .faculty-dashboard-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .faculty-dashboard .form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1440px) {
+  /* Large Desktops */
+  .faculty-dashboard .sidebar {
+    width: 280px !important;
+  }
+
+  .faculty-dashboard .main-content {
+    margin-left: 280px !important;
+    width: calc(100vw - 280px) !important;
+  }
+
+  .faculty-dashboard .stats-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  .faculty-dashboard .faculty-dashboard-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .faculty-dashboard .form-row {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
